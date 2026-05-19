@@ -93,22 +93,6 @@ export default function App() {
     window.print();
   };
 
-  const Field = ({ label, value, onChange, suffix = "" }) => (
-    <label style={styles.field}>
-      <span style={styles.label}>{label}</span>
-      <div style={styles.inputRow}>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={formatInputValue(value)}
-          onChange={handleNumberChange(onChange)}
-          style={styles.input}
-        />
-        <span style={styles.suffix}>{suffix}</span>
-      </div>
-    </label>
-  );
-
   return (
     <main style={styles.page}>
       <style>{printAndResponsiveCss}</style>
@@ -135,13 +119,13 @@ export default function App() {
         <section style={styles.layout} className="main-layout">
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>入力条件</h2>
-            <Field label="現在の月間PV" value={monthlyPv} onChange={setMonthlyPv} suffix="PV" />
-            <Field label="毎月のPV増加見込み" value={monthlyPvIncrease} onChange={setMonthlyPvIncrease} suffix="PV" />
-            <Field label="問い合わせ率" value={inquiryRate} onChange={setInquiryRate} suffix="%" />
-            <Field label="契約率" value={closeRate} onChange={setCloseRate} suffix="%" />
-            <Field label="1契約あたり月額売上" value={monthlyRevenuePerContract} onChange={setMonthlyRevenuePerContract} suffix="円" />
-            <Field label="初期制作費" value={initialCost} onChange={setInitialCost} suffix="円" />
-            <Field label="月額運用・記事費用" value={monthlyContentCost} onChange={setMonthlyContentCost} suffix="円" />
+            <Field label="現在の月間PV" value={monthlyPv} onChange={setMonthlyPv} suffix="PV" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field label="毎月のPV増加見込み" value={monthlyPvIncrease} onChange={setMonthlyPvIncrease} suffix="PV" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field label="問い合わせ率" value={inquiryRate} onChange={setInquiryRate} suffix="%" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field label="契約率" value={closeRate} onChange={setCloseRate} suffix="%" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field label="1契約あたり月額売上" value={monthlyRevenuePerContract} onChange={setMonthlyRevenuePerContract} suffix="円" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field label="初期制作費" value={initialCost} onChange={setInitialCost} suffix="円" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field label="月額運用・記事費用" value={monthlyContentCost} onChange={setMonthlyContentCost} suffix="円" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
 
             <label style={styles.field}>
               <span style={styles.label}>試算期間：{months}ヶ月</span>
@@ -188,6 +172,24 @@ export default function App() {
         </section>
       </div>
     </main>
+  );
+}
+
+function Field({ label, value, onChange, suffix = "", formatInputValue, handleNumberChange }) {
+  return (
+    <label style={styles.field}>
+      <span style={styles.label}>{label}</span>
+      <div style={styles.inputRow}>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={formatInputValue(value)}
+          onChange={handleNumberChange(onChange)}
+          style={styles.input}
+        />
+        <span style={styles.suffix}>{suffix}</span>
+      </div>
+    </label>
   );
 }
 

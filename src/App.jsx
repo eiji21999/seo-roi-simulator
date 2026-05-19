@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from "react";
 
 export default function App() {
-  const [monthlyPv, setMonthlyPv] = useState(6500);
-  const [monthlyPvIncrease, setMonthlyPvIncrease] = useState(500);
-  const [inquiryRate, setInquiryRate] = useState(0.35);
-  const [closeRate, setCloseRate] = useState(8.3);
-  const [monthlyRevenuePerContract, setMonthlyRevenuePerContract] = useState(370000);
-  const [initialCost, setInitialCost] = useState(150000);
-  const [monthlyContentCost, setMonthlyContentCost] = useState(160000);
+  const [monthlyPv, setMonthlyPv] = useState(0);
+  const [monthlyPvIncrease, setMonthlyPvIncrease] = useState(0);
+  const [inquiryRate, setInquiryRate] = useState(0.1);
+  const [closeRate, setCloseRate] = useState(0.1);
+  const [monthlyRevenuePerContract, setMonthlyRevenuePerContract] = useState(0);
+  const [initialCost, setInitialCost] = useState(0);
+  const [monthlyContentCost, setMonthlyContentCost] = useState(0);
   const [months, setMonths] = useState(12);
 
   const yen = (value) =>

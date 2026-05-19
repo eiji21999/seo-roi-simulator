@@ -9,6 +9,7 @@ export default function App() {
   const [initialCost, setInitialCost] = useState("0");
   const [monthlyContentCost, setMonthlyContentCost] = useState("0");
   const [months, setMonths] = useState(12);
+  const [focusedField, setFocusedField] = useState("");
 
   const yen = (value) =>
     new Intl.NumberFormat("ja-JP", {
@@ -38,9 +39,9 @@ export default function App() {
   };
 
   const handleNumberChange = (setter) => (event) => {
-    const value = event.target.value.replace(/,/g, "");
-    if (/^[0-9]*[.]?[0-9]*$/.test(value)) {
-      setter(value);
+    const rawValue = event.target.value.replace(/,/g, "");
+    if (/^[0-9]*[.]?[0-9]*$/.test(rawValue)) {
+      setter(rawValue);
     }
   };
 
@@ -87,6 +88,7 @@ export default function App() {
     setInitialCost("0");
     setMonthlyContentCost("0");
     setMonths(12);
+    setFocusedField("");
   };
 
   const downloadPdf = () => {
@@ -119,13 +121,13 @@ export default function App() {
         <section style={styles.layout} className="main-layout">
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>入力条件</h2>
-            <Field label="現在の月間PV" value={monthlyPv} onChange={setMonthlyPv} suffix="PV" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field label="毎月のPV増加見込み" value={monthlyPvIncrease} onChange={setMonthlyPvIncrease} suffix="PV" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field label="問い合わせ率" value={inquiryRate} onChange={setInquiryRate} suffix="%" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field label="契約率" value={closeRate} onChange={setCloseRate} suffix="%" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field label="1契約あたり月額売上" value={monthlyRevenuePerContract} onChange={setMonthlyRevenuePerContract} suffix="円" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field label="初期制作費" value={initialCost} onChange={setInitialCost} suffix="円" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field label="月額運用・記事費用" value={monthlyContentCost} onChange={setMonthlyContentCost} suffix="円" formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field name="monthlyPv" label="現在の月間PV" value={monthlyPv} onChange={setMonthlyPv} suffix="PV" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field name="monthlyPvIncrease" label="毎月のPV増加見込み" value={monthlyPvIncrease} onChange={setMonthlyPvIncrease} suffix="PV" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field name="inquiryRate" label="問い合わせ率" value={inquiryRate} onChange={setInquiryRate} suffix="%" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field name="closeRate" label="契約率" value={closeRate} onChange={setCloseRate} suffix="%" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field name="monthlyRevenuePerContract" label="1契約あたり月額売上" value={monthlyRevenuePerContract} onChange={setMonthlyRevenuePerContract} suffix="円" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field name="initialCost" label="初期制作費" value={initialCost} onChange={setInitialCost} suffix="円" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field name="monthlyContentCost" label="月額運用・記事費用" value={monthlyContentCost} onChange={setMonthlyContentCost} suffix="円" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
 
             <label style={styles.field}>
               <span style={styles.label}>試算期間：{months}ヶ月</span>
@@ -175,7 +177,10 @@ export default function App() {
   );
 }
 
-function Field({ label, value, onChange, suffix = "", formatInputValue, handleNumberChange }) {
+function Field({ name, label, value, onChange, suffix = "", focusedField, setFocusedField, formatInputValue, handleNumberChange }) {
+  const isFocused = focusedField === name;
+  const displayValue = isFocused ? value : formatInputValue(value);
+
   return (
     <label style={styles.field}>
       <span style={styles.label}>{label}</span>
@@ -183,7 +188,9 @@ function Field({ label, value, onChange, suffix = "", formatInputValue, handleNu
         <input
           type="text"
           inputMode="decimal"
-          value={formatInputValue(value)}
+          value={displayValue}
+          onFocus={() => setFocusedField(name)}
+          onBlur={() => setFocusedField("")}
           onChange={handleNumberChange(onChange)}
           style={styles.input}
         />

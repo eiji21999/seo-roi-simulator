@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from "react";
 
 export default function App() {
-  const [monthlyPv, setMonthlyPv] = useState(0);
-  const [monthlyPvIncrease, setMonthlyPvIncrease] = useState(0);
-  const [inquiryRate, setInquiryRate] = useState(0.1);
-  const [closeRate, setCloseRate] = useState(0.1);
-  const [monthlyRevenuePerContract, setMonthlyRevenuePerContract] = useState(0);
-  const [initialCost, setInitialCost] = useState(0);
-  const [monthlyContentCost, setMonthlyContentCost] = useState(0);
+  const [monthlyPv, setMonthlyPv] = useState("0");
+  const [monthlyPvIncrease, setMonthlyPvIncrease] = useState("0");
+  const [inquiryRate, setInquiryRate] = useState("0");
+  const [closeRate, setCloseRate] = useState("0");
+  const [monthlyRevenuePerContract, setMonthlyRevenuePerContract] = useState("0");
+  const [initialCost, setInitialCost] = useState("0");
+  const [monthlyContentCost, setMonthlyContentCost] = useState("0");
   const [months, setMonths] = useState(12);
 
   const yen = (value) =>
@@ -17,7 +17,32 @@ export default function App() {
       maximumFractionDigits: 0,
     }).format(Number(value) || 0);
 
-  const toNumber = (value) => Number(value) || 0;
+  const comma = (value) =>
+    new Intl.NumberFormat("ja-JP", {
+      maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
+  const toNumber = (value) => Number(String(value).replace(/,/g, "")) || 0;
+
+  const formatInputValue = (value) => {
+    const rawValue = String(value).replace(/,/g, "");
+    if (rawValue === "") return "";
+    if (rawValue === ".") return "0.";
+    if (rawValue.endsWith(".")) return comma(rawValue.slice(0, -1)) + ".";
+
+    const parts = rawValue.split(".");
+    const integerPart = parts[0];
+    const decimalPart = parts[1];
+    const formattedInteger = new Intl.NumberFormat("ja-JP").format(Number(integerPart) || 0);
+    return decimalPart !== undefined ? formattedInteger + "." + decimalPart : formattedInteger;
+  };
+
+  const handleNumberChange = (setter) => (event) => {
+    const value = event.target.value.replace(/,/g, "");
+    if (/^[0-9]*[.]?[0-9]*$/.test(value)) {
+      setter(value);
+    }
+  };
 
   const data = useMemo(() => {
     let cumulativeCost = toNumber(initialCost);
@@ -36,7 +61,7 @@ export default function App() {
       const cumulativeProfit = cumulativeRevenue - cumulativeCost;
 
       return {
-        month: `${month}月目`,
+        month: month + "月目",
         pv: Math.round(pv),
         inquiries: Number(inquiries.toFixed(1)),
         newContracts: Number(newContracts.toFixed(2)),
@@ -51,16 +76,16 @@ export default function App() {
 
   const last = data[data.length - 1];
   const paybackMonth = data.find((item) => item.cumulativeProfit >= 0)?.month || "未回収";
-  const roi = last ? ((last.cumulativeRevenue - last.cumulativeCost) / last.cumulativeCost) * 100 : 0;
+  const roi = last && last.cumulativeCost !== 0 ? ((last.cumulativeRevenue - last.cumulativeCost) / last.cumulativeCost) * 100 : 0;
 
   const reset = () => {
-    setMonthlyPv(6500);
-    setMonthlyPvIncrease(500);
-    setInquiryRate(0.35);
-    setCloseRate(8.3);
-    setMonthlyRevenuePerContract(370000);
-    setInitialCost(150000);
-    setMonthlyContentCost(160000);
+    setMonthlyPv("0");
+    setMonthlyPvIncrease("0");
+    setInquiryRate("0");
+    setCloseRate("0");
+    setMonthlyRevenuePerContract("0");
+    setInitialCost("0");
+    setMonthlyContentCost("0");
     setMonths(12);
   };
 
@@ -73,9 +98,10 @@ export default function App() {
       <span style={styles.label}>{label}</span>
       <div style={styles.inputRow}>
         <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          type="text"
+          inputMode="decimal"
+          value={formatInputValue(value)}
+          onChange={handleNumberChange(onChange)}
           style={styles.input}
         />
         <span style={styles.suffix}>{suffix}</span>
@@ -100,10 +126,10 @@ export default function App() {
         </header>
 
         <section style={styles.summaryGrid}>
-          <Summary title="累計利益" value={yen(last?.cumulativeProfit)} />
-          <Summary title="ROI" value={`${roi.toFixed(1)}%`} />
+          <Summary title="累計利益" value={yen(last?.cumulativeProfit)} negative={last?.cumulativeProfit < 0} />
+          <Summary title="ROI" value={roi.toFixed(1) + "%"} negative={roi < 0} />
           <Summary title="回収月" value={paybackMonth} />
-          <Summary title="累計契約数" value={`${last?.activeContracts.toFixed(2)}件`} />
+          <Summary title="累計契約数" value={comma(last?.activeContracts) + "件"} />
         </section>
 
         <section style={styles.layout} className="main-layout">
@@ -126,7 +152,7 @@ export default function App() {
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>試算結果</h2>
             <p style={styles.resultLead}>
-              {months}ヶ月後の累計利益は <strong>{yen(last?.cumulativeProfit)}</strong>、ROIは <strong>{roi.toFixed(1)}%</strong>、回収月は <strong>{paybackMonth}</strong> です。
+              {months}ヶ月後の累計利益は <strong style={last?.cumulativeProfit < 0 ? styles.negativeText : undefined}>{yen(last?.cumulativeProfit)}</strong>、ROIは <strong style={roi < 0 ? styles.negativeText : undefined}>{roi.toFixed(1)}%</strong>、回収月は <strong>{paybackMonth}</strong> です。
             </p>
             <div style={styles.tableScroll}>
               <table style={styles.table}>
@@ -146,13 +172,13 @@ export default function App() {
                   {data.map((item) => (
                     <tr key={item.month}>
                       <Td>{item.month}</Td>
-                      <Td>{item.pv.toLocaleString()}</Td>
-                      <Td>{item.inquiries}</Td>
-                      <Td>{item.newContracts}</Td>
-                      <Td>{item.activeContracts}</Td>
+                      <Td>{comma(item.pv)}</Td>
+                      <Td>{comma(item.inquiries)}</Td>
+                      <Td>{comma(item.newContracts)}</Td>
+                      <Td>{comma(item.activeContracts)}</Td>
                       <Td>{yen(item.monthlyRevenue)}</Td>
                       <Td>{yen(item.cumulativeCost)}</Td>
-                      <Td>{yen(item.cumulativeProfit)}</Td>
+                      <Td negative={item.cumulativeProfit < 0}>{yen(item.cumulativeProfit)}</Td>
                     </tr>
                   ))}
                 </tbody>
@@ -165,11 +191,11 @@ export default function App() {
   );
 }
 
-function Summary({ title, value }) {
+function Summary({ title, value, negative = false }) {
   return (
     <div style={styles.summaryCard}>
       <p style={styles.summaryTitle}>{title}</p>
-      <p style={styles.summaryValue}>{value}</p>
+      <p style={{ ...styles.summaryValue, ...(negative ? styles.negativeText : {}) }}>{value}</p>
     </div>
   );
 }
@@ -178,8 +204,8 @@ function Th({ children }) {
   return <th style={styles.th}>{children}</th>;
 }
 
-function Td({ children }) {
-  return <td style={styles.td}>{children}</td>;
+function Td({ children, negative = false }) {
+  return <td style={{ ...styles.td, ...(negative ? styles.negativeText : {}) }}>{children}</td>;
 }
 
 const styles = {
@@ -202,6 +228,7 @@ const styles = {
   summaryCard: { background: "white", borderRadius: 20, padding: 22, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)" },
   summaryTitle: { margin: 0, color: "#64748b", fontWeight: 700 },
   summaryValue: { margin: "10px 0 0", fontSize: "clamp(22px, 5vw, 28px)", fontWeight: 800 },
+  negativeText: { color: "#9f1239", fontWeight: 800 },
   layout: { display: "grid", gridTemplateColumns: "340px 1fr", gap: 24, alignItems: "start" },
   card: { background: "white", borderRadius: 20, padding: 24, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)", overflowX: "auto" },
   cardTitle: { margin: "0 0 18px", fontSize: 22 },

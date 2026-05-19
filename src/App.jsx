@@ -64,6 +64,10 @@ export default function App() {
     setMonths(12);
   };
 
+  const downloadPdf = () => {
+    window.print();
+  };
+
   const Field = ({ label, value, onChange, suffix = "" }) => (
     <label style={styles.field}>
       <span style={styles.label}>{label}</span>
@@ -81,6 +85,7 @@ export default function App() {
 
   return (
     <main style={styles.page}>
+      <style>{printAndResponsiveCss}</style>
       <div style={styles.container}>
         <header style={styles.header}>
           <div>
@@ -88,7 +93,10 @@ export default function App() {
             <h1 style={styles.title}>SEO ROI シミュレーター</h1>
             <p style={styles.text}>PV・問い合わせ率・契約率・費用を入力して、投資回収の見込みを試算します。</p>
           </div>
-          <button onClick={reset} style={styles.button}>初期値に戻す</button>
+          <div style={styles.actionArea} className="no-print">
+            <button onClick={downloadPdf} style={styles.primaryButton}>PDF出力</button>
+            <button onClick={reset} style={styles.button}>初期値に戻す</button>
+          </div>
         </header>
 
         <section style={styles.summaryGrid}>
@@ -98,7 +106,7 @@ export default function App() {
           <Summary title="累計契約数" value={`${last?.activeContracts.toFixed(2)}件`} />
         </section>
 
-        <section style={styles.layout}>
+        <section style={styles.layout} className="main-layout">
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>入力条件</h2>
             <Field label="現在の月間PV" value={monthlyPv} onChange={setMonthlyPv} suffix="PV" />
@@ -111,40 +119,45 @@ export default function App() {
 
             <label style={styles.field}>
               <span style={styles.label}>試算期間：{months}ヶ月</span>
-              <input type="range" min="3" max="36" value={months} onChange={(e) => setMonths(Number(e.target.value))} />
+              <input type="range" min="3" max="36" value={months} onChange={(e) => setMonths(Number(e.target.value))} style={styles.range} />
             </label>
           </div>
 
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>試算結果</h2>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <Th>月</Th>
-                  <Th>PV</Th>
-                  <Th>問い合わせ</Th>
-                  <Th>新規契約</Th>
-                  <Th>累計契約</Th>
-                  <Th>月間売上</Th>
-                  <Th>累計費用</Th>
-                  <Th>累計利益</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((item) => (
-                  <tr key={item.month}>
-                    <Td>{item.month}</Td>
-                    <Td>{item.pv.toLocaleString()}</Td>
-                    <Td>{item.inquiries}</Td>
-                    <Td>{item.newContracts}</Td>
-                    <Td>{item.activeContracts}</Td>
-                    <Td>{yen(item.monthlyRevenue)}</Td>
-                    <Td>{yen(item.cumulativeCost)}</Td>
-                    <Td>{yen(item.cumulativeProfit)}</Td>
+            <p style={styles.resultLead}>
+              {months}ヶ月後の累計利益は <strong>{yen(last?.cumulativeProfit)}</strong>、ROIは <strong>{roi.toFixed(1)}%</strong>、回収月は <strong>{paybackMonth}</strong> です。
+            </p>
+            <div style={styles.tableScroll}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <Th>月</Th>
+                    <Th>PV</Th>
+                    <Th>問い合わせ</Th>
+                    <Th>新規契約</Th>
+                    <Th>累計契約</Th>
+                    <Th>月間売上</Th>
+                    <Th>累計費用</Th>
+                    <Th>累計利益</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.map((item) => (
+                    <tr key={item.month}>
+                      <Td>{item.month}</Td>
+                      <Td>{item.pv.toLocaleString()}</Td>
+                      <Td>{item.inquiries}</Td>
+                      <Td>{item.newContracts}</Td>
+                      <Td>{item.activeContracts}</Td>
+                      <Td>{yen(item.monthlyRevenue)}</Td>
+                      <Td>{yen(item.cumulativeCost)}</Td>
+                      <Td>{yen(item.cumulativeProfit)}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       </div>
@@ -180,22 +193,74 @@ const styles = {
   container: { maxWidth: "1180px", margin: "0 auto" },
   header: { display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 24 },
   sub: { margin: 0, color: "#64748b", fontWeight: 700 },
-  title: { margin: "8px 0", fontSize: "40px", lineHeight: 1.2 },
-  text: { margin: 0, color: "#64748b" },
+  title: { margin: "8px 0", fontSize: "clamp(30px, 5vw, 40px)", lineHeight: 1.2 },
+  text: { margin: 0, color: "#64748b", lineHeight: 1.7 },
+  actionArea: { display: "flex", gap: 10, flexWrap: "wrap" },
   button: { border: "1px solid #cbd5e1", background: "white", borderRadius: 12, padding: "12px 18px", cursor: "pointer", fontWeight: 700 },
-  summaryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 },
+  primaryButton: { border: "1px solid #0f172a", background: "#0f172a", color: "white", borderRadius: 12, padding: "12px 18px", cursor: "pointer", fontWeight: 700 },
+  summaryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 },
   summaryCard: { background: "white", borderRadius: 20, padding: 22, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)" },
   summaryTitle: { margin: 0, color: "#64748b", fontWeight: 700 },
-  summaryValue: { margin: "10px 0 0", fontSize: 28, fontWeight: 800 },
+  summaryValue: { margin: "10px 0 0", fontSize: "clamp(22px, 5vw, 28px)", fontWeight: 800 },
   layout: { display: "grid", gridTemplateColumns: "340px 1fr", gap: 24, alignItems: "start" },
   card: { background: "white", borderRadius: 20, padding: 24, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)", overflowX: "auto" },
   cardTitle: { margin: "0 0 18px", fontSize: 22 },
+  resultLead: { margin: "0 0 18px", lineHeight: 1.8, color: "#334155" },
   field: { display: "grid", gap: 8, marginBottom: 14 },
   label: { color: "#475569", fontSize: 14, fontWeight: 700 },
   inputRow: { display: "flex", gap: 8, alignItems: "center" },
-  input: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "11px 12px", fontSize: 16 },
+  input: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "12px 12px", fontSize: 16, boxSizing: "border-box" },
   suffix: { width: 36, color: "#64748b", fontSize: 14 },
+  range: { width: "100%" },
+  tableScroll: { width: "100%", overflowX: "auto" },
   table: { width: "100%", minWidth: 760, borderCollapse: "collapse", fontSize: 14 },
   th: { textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0", padding: 12, whiteSpace: "nowrap" },
   td: { borderBottom: "1px solid #e2e8f0", padding: 12, whiteSpace: "nowrap" },
 };
+
+const printAndResponsiveCss = `
+  * {
+    box-sizing: border-box;
+  }
+
+  @media (max-width: 768px) {
+    main {
+      padding: 20px 12px !important;
+    }
+
+    .main-layout {
+      grid-template-columns: 1fr !important;
+    }
+
+    header {
+      align-items: flex-start !important;
+    }
+
+    button {
+      width: 100%;
+    }
+  }
+
+  @media print {
+    body {
+      background: #ffffff !important;
+    }
+
+    main {
+      background: #ffffff !important;
+      padding: 0 !important;
+    }
+
+    .no-print {
+      display: none !important;
+    }
+
+    div {
+      box-shadow: none !important;
+    }
+
+    table {
+      font-size: 11px !important;
+    }
+  }
+`;

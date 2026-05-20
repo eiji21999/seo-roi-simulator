@@ -9,7 +9,7 @@ export default function App() {
   const [initialCost, setInitialCost] = useState("0");
   const [monthlyContentCost, setMonthlyContentCost] = useState("0");
   const [months, setMonths] = useState(12);
-  const [focusedField, setFocusedField] = useState("");
+  const [roundContracts, setRoundContracts] = useState(false);
 
   const yen = (value) =>
     new Intl.NumberFormat("ja-JP", {
@@ -25,24 +25,29 @@ export default function App() {
 
   const toNumber = (value) => Number(String(value).replace(/,/g, "")) || 0;
 
-  const formatInputValue = (value) => {
-    const rawValue = String(value).replace(/,/g, "");
-    if (rawValue === "") return "";
-    if (rawValue === ".") return "0.";
-    if (rawValue.endsWith(".")) return comma(rawValue.slice(0, -1)) + ".";
+  const sanitizeNumber = (value) => {
+    const raw = String(value).replace(/,/g, "");
+    const cleaned = raw.replace(/[^0-9.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length <= 2) return cleaned;
+    return parts[0] + "." + parts.slice(1).join("");
+  };
 
-    const parts = rawValue.split(".");
-    const integerPart = parts[0];
+  const formatNumberText = (value) => {
+    const raw = sanitizeNumber(value);
+    if (raw === "") return "0";
+    if (raw === ".") return "0";
+    if (raw.endsWith(".")) return comma(raw.slice(0, -1));
+
+    const parts = raw.split(".");
+    const integerPart = parts[0] || "0";
     const decimalPart = parts[1];
     const formattedInteger = new Intl.NumberFormat("ja-JP").format(Number(integerPart) || 0);
     return decimalPart !== undefined ? formattedInteger + "." + decimalPart : formattedInteger;
   };
 
-  const handleNumberChange = (setter) => (event) => {
-    const rawValue = event.target.value.replace(/,/g, "");
-    if (/^[0-9]*[.]?[0-9]*$/.test(rawValue)) {
-      setter(rawValue);
-    }
+  const displayContractCount = (value) => {
+    return roundContracts ? Math.round(Number(value) || 0) : comma(value);
   };
 
   const data = useMemo(() => {
@@ -54,8 +59,8 @@ export default function App() {
       const month = i + 1;
       const pv = toNumber(monthlyPv) + toNumber(monthlyPvIncrease) * month;
       const inquiries = pv * (toNumber(inquiryRate) / 100);
-      const newContracts = inquiries * (toNumber(closeRate) / 100);
-      activeContracts += newContracts;
+      const newContractsRaw = inquiries * (toNumber(closeRate) / 100);
+      activeContracts += newContractsRaw;
       const monthlyRevenue = activeContracts * toNumber(monthlyRevenuePerContract);
       cumulativeRevenue += monthlyRevenue;
       cumulativeCost += toNumber(monthlyContentCost);
@@ -65,7 +70,7 @@ export default function App() {
         month: month + "月目",
         pv: Math.round(pv),
         inquiries: Number(inquiries.toFixed(1)),
-        newContracts: Number(newContracts.toFixed(2)),
+        newContracts: Number(newContractsRaw.toFixed(2)),
         activeContracts: Number(activeContracts.toFixed(2)),
         monthlyRevenue: Math.round(monthlyRevenue),
         cumulativeCost: Math.round(cumulativeCost),
@@ -88,7 +93,7 @@ export default function App() {
     setInitialCost("0");
     setMonthlyContentCost("0");
     setMonths(12);
-    setFocusedField("");
+    setRoundContracts(false);
   };
 
   const downloadPdf = () => {
@@ -115,23 +120,32 @@ export default function App() {
           <Summary title="累計利益" value={yen(last?.cumulativeProfit)} negative={last?.cumulativeProfit < 0} />
           <Summary title="ROI" value={roi.toFixed(1) + "%"} negative={roi < 0} />
           <Summary title="回収月" value={paybackMonth} />
-          <Summary title="累計契約数" value={comma(last?.activeContracts) + "件"} />
+          <Summary title="累計契約数" value={displayContractCount(last?.activeContracts) + "件"} />
         </section>
 
         <section style={styles.layout} className="main-layout">
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>入力条件</h2>
-            <Field name="monthlyPv" label="現在の月間PV" value={monthlyPv} onChange={setMonthlyPv} suffix="PV" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field name="monthlyPvIncrease" label="毎月のPV増加見込み" value={monthlyPvIncrease} onChange={setMonthlyPvIncrease} suffix="PV" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field name="inquiryRate" label="問い合わせ率" value={inquiryRate} onChange={setInquiryRate} suffix="%" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field name="closeRate" label="契約率" value={closeRate} onChange={setCloseRate} suffix="%" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field name="monthlyRevenuePerContract" label="1契約あたり月額売上" value={monthlyRevenuePerContract} onChange={setMonthlyRevenuePerContract} suffix="円" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field name="initialCost" label="初期制作費" value={initialCost} onChange={setInitialCost} suffix="円" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
-            <Field name="monthlyContentCost" label="月額運用・記事費用" value={monthlyContentCost} onChange={setMonthlyContentCost} suffix="円" focusedField={focusedField} setFocusedField={setFocusedField} formatInputValue={formatInputValue} handleNumberChange={handleNumberChange} />
+            <Field label="現在の月間PV" value={monthlyPv} onChange={setMonthlyPv} suffix="PV" sanitizeNumber={sanitizeNumber} formatNumberText={formatNumberText} />
+            <Field label="毎月のPV増加見込み" value={monthlyPvIncrease} onChange={setMonthlyPvIncrease} suffix="PV" sanitizeNumber={sanitizeNumber} formatNumberText={formatNumberText} />
+            <Field label="問い合わせ率" value={inquiryRate} onChange={setInquiryRate} suffix="%" sanitizeNumber={sanitizeNumber} formatNumberText={formatNumberText} />
+            <Field label="契約率" value={closeRate} onChange={setCloseRate} suffix="%" sanitizeNumber={sanitizeNumber} formatNumberText={formatNumberText} />
+            <Field label="1契約あたり月額売上" value={monthlyRevenuePerContract} onChange={setMonthlyRevenuePerContract} suffix="円" sanitizeNumber={sanitizeNumber} formatNumberText={formatNumberText} />
+            <Field label="初期制作費" value={initialCost} onChange={setInitialCost} suffix="円" sanitizeNumber={sanitizeNumber} formatNumberText={formatNumberText} />
+            <Field label="月額運用・記事費用" value={monthlyContentCost} onChange={setMonthlyContentCost} suffix="円" sanitizeNumber={sanitizeNumber} formatNumberText={formatNumberText} />
 
             <label style={styles.field}>
               <span style={styles.label}>試算期間：{months}ヶ月</span>
               <input type="range" min="3" max="36" value={months} onChange={(e) => setMonths(Number(e.target.value))} style={styles.range} />
+            </label>
+
+            <label style={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                checked={roundContracts}
+                onChange={(e) => setRoundContracts(e.target.checked)}
+              />
+              <span>契約件数を四捨五入表示</span>
             </label>
           </div>
 
@@ -160,8 +174,8 @@ export default function App() {
                       <Td>{item.month}</Td>
                       <Td>{comma(item.pv)}</Td>
                       <Td>{comma(item.inquiries)}</Td>
-                      <Td>{comma(item.newContracts)}</Td>
-                      <Td>{comma(item.activeContracts)}</Td>
+                      <Td>{displayContractCount(item.newContracts)}</Td>
+                      <Td>{displayContractCount(item.activeContracts)}</Td>
                       <Td>{yen(item.monthlyRevenue)}</Td>
                       <Td>{yen(item.cumulativeCost)}</Td>
                       <Td negative={item.cumulativeProfit < 0}>{yen(item.cumulativeProfit)}</Td>
@@ -177,9 +191,19 @@ export default function App() {
   );
 }
 
-function Field({ name, label, value, onChange, suffix = "", focusedField, setFocusedField, formatInputValue, handleNumberChange }) {
-  const isFocused = focusedField === name;
-  const displayValue = isFocused ? value : formatInputValue(value);
+function Field({ label, value, onChange, suffix = "", sanitizeNumber, formatNumberText }) {
+  const handleChange = (event) => {
+    onChange(sanitizeNumber(event.target.value));
+  };
+
+  const handleFocus = () => {
+    const raw = sanitizeNumber(value);
+    onChange(raw === "0" ? "" : raw);
+  };
+
+  const handleBlur = () => {
+    onChange(formatNumberText(value));
+  };
 
   return (
     <label style={styles.field}>
@@ -188,10 +212,10 @@ function Field({ name, label, value, onChange, suffix = "", focusedField, setFoc
         <input
           type="text"
           inputMode="decimal"
-          value={displayValue}
-          onFocus={() => setFocusedField(name)}
-          onBlur={() => setFocusedField("")}
-          onChange={handleNumberChange(onChange)}
+          value={value}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           style={styles.input}
         />
         <span style={styles.suffix}>{suffix}</span>
@@ -248,6 +272,7 @@ const styles = {
   input: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "12px 12px", fontSize: 16, boxSizing: "border-box" },
   suffix: { width: 36, color: "#64748b", fontSize: 14 },
   range: { width: "100%" },
+  checkboxRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 14, color: "#475569", cursor: "pointer" },
   tableScroll: { width: "100%", overflowX: "auto" },
   table: { width: "100%", minWidth: 760, borderCollapse: "collapse", fontSize: 14 },
   th: { textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0", padding: 12, whiteSpace: "nowrap" },

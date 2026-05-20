@@ -53,15 +53,29 @@ export default function App() {
   const data = useMemo(() => {
     let cumulativeCost = toNumber(initialCost);
     let cumulativeRevenue = 0;
-    let activeContracts = 0;
+    let activeContractsRaw = 0;
 
     return Array.from({ length: months }, (_, i) => {
       const month = i + 1;
       const pv = toNumber(monthlyPv) + toNumber(monthlyPvIncrease) * month;
       const inquiries = pv * (toNumber(inquiryRate) / 100);
       const newContractsRaw = inquiries * (toNumber(closeRate) / 100);
-      activeContracts += newContractsRaw;
-      const monthlyRevenue = activeContracts * toNumber(monthlyRevenuePerContract);
+
+      activeContractsRaw += newContractsRaw;
+
+      const newContractsForDisplay = roundContracts
+        ? Math.round(newContractsRaw)
+        : Number(newContractsRaw.toFixed(2));
+
+      const activeContractsForDisplay = roundContracts
+        ? Math.round(activeContractsRaw)
+        : Number(activeContractsRaw.toFixed(2));
+
+      const contractBaseForRevenue = roundContracts
+        ? Math.round(activeContractsRaw)
+        : activeContractsRaw;
+
+      const monthlyRevenue = contractBaseForRevenue * toNumber(monthlyRevenuePerContract);
       cumulativeRevenue += monthlyRevenue;
       cumulativeCost += toNumber(monthlyContentCost);
       const cumulativeProfit = cumulativeRevenue - cumulativeCost;
@@ -70,15 +84,25 @@ export default function App() {
         month: month + "月目",
         pv: Math.round(pv),
         inquiries: Number(inquiries.toFixed(1)),
-        newContracts: Number(newContractsRaw.toFixed(2)),
-        activeContracts: Number(activeContracts.toFixed(2)),
+        newContracts: newContractsForDisplay,
+        activeContracts: activeContractsForDisplay,
         monthlyRevenue: Math.round(monthlyRevenue),
         cumulativeCost: Math.round(cumulativeCost),
         cumulativeRevenue: Math.round(cumulativeRevenue),
         cumulativeProfit: Math.round(cumulativeProfit),
       };
     });
-  }, [monthlyPv, monthlyPvIncrease, inquiryRate, closeRate, monthlyRevenuePerContract, initialCost, monthlyContentCost, months]);
+  }, [
+    monthlyPv,
+    monthlyPvIncrease,
+    inquiryRate,
+    closeRate,
+    monthlyRevenuePerContract,
+    initialCost,
+    monthlyContentCost,
+    months,
+    roundContracts,
+  ]);
 
   const last = data[data.length - 1];
   const paybackMonth = data.find((item) => item.cumulativeProfit >= 0)?.month || "未回収";
@@ -145,7 +169,7 @@ export default function App() {
                 checked={roundContracts}
                 onChange={(e) => setRoundContracts(e.target.checked)}
               />
-              <span>契約件数を四捨五入表示</span>
+              <span>契約件数を四捨五入表示し、売上・利益にも反映</span>
             </label>
           </div>
 

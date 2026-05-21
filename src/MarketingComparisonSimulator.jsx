@@ -274,7 +274,7 @@ export default function App() {
             </div>
 
                        <div style={{ marginBottom: 40 }}>
-  <h3 style={styles.graphTitle}>CV比較</h3>
+  <h3 style={styles.graphTitle}>CV数比較</h3>
   <div style={{ width: "100%", height: 320 }}>
     <ResponsiveContainer>
     <BarChart data={results}>

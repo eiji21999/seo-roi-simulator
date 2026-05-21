@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -6,789 +6,682 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  CartesianGrid,
+  LabelList,
   PieChart,
   Pie,
   Cell,
   Legend,
 } from "recharts";
 
-const BLUE = "#1d4ed8";
-const COLORS = ["#1d4ed8", "#2563eb", "#38bdf8", "#0f172a", "#64748b"];
-
-const initialInfluencers = [
+const initialMeasures = [
   {
     id: 1,
-    name: "インフルエンサーA",
-    sns: "Instagram",
-    followers: 50000,
-    views: 20000,
-    engagementRate: 3,
-    cost: 150000,
-    cvr: 1,
-    averageOrderValue: 30000,
+    name: "SEO",
+    sessions: "5000",
+    cvr: "1.2",
+    revenuePerCv: "300000",
+    budgetShare: "30",
   },
   {
     id: 2,
-    name: "インフルエンサーB",
-    sns: "TikTok",
-    followers: 120000,
-    views: 50000,
-    engagementRate: 5,
-    cost: 250000,
-    cvr: 0.8,
-    averageOrderValue: 30000,
+    name: "Google広告",
+    sessions: "3000",
+    cvr: "2.5",
+    revenuePerCv: "300000",
+    budgetShare: "50",
+  },
+  {
+    id: 3,
+    name: "SNS広告",
+    sessions: "4000",
+    cvr: "0.8",
+    revenuePerCv: "300000",
+    budgetShare: "20",
   },
 ];
 
-const formatYen = (num) =>
-  new Intl.NumberFormat("ja-JP", {
-    style: "currency",
-    currency: "JPY",
-    maximumFractionDigits: 0,
-  }).format(num || 0);
+const BAR_COLOR = "#1d4ed8";
+const PIE_COLORS = ["#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe"];
 
-const formatNumber = (num) =>
-  new Intl.NumberFormat("ja-JP").format(Math.round(num || 0));
+export default function App() {
+  const [measures, setMeasures] = useState(initialMeasures);
+  const [roundNumbers, setRoundNumbers] = useState(true);
+  const [totalBudget, setTotalBudget] = useState("1000000");
+  const [activeTab, setActiveTab] = useState("summary");
+  const [shareMessage, setShareMessage] = useState("");
 
-export default function InfluencerComparisonSimulator() {
-  const [influencers, setInfluencers] = useState(initialInfluencers);
-  const [copied, setCopied] = useState(false);
+  const toNumber = (value) => Number(String(value).replace(/,/g, "")) || 0;
+
+  const yen = (value) =>
+    new Intl.NumberFormat("ja-JP", {
+      style: "currency",
+      currency: "JPY",
+      maximumFractionDigits: 0,
+    }).format(Number(value) || 0);
+
+  const comma = (value) =>
+    new Intl.NumberFormat("ja-JP", {
+      maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+
+  const sanitizeNumber = (value) => {
+    const raw = String(value).replace(/,/g, "");
+    const cleaned = raw.replace(/[^0-9.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length <= 2) return cleaned;
+    return parts[0] + "." + parts.slice(1).join("");
+  };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const data = params.get("data");
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const encoded = params.get("data");
+      if (!encoded) return;
 
-    if (data) {
-      try {
-        const decoded = JSON.parse(decodeURIComponent(atob(data)));
-        if (Array.isArray(decoded)) setInfluencers(decoded);
-      } catch {
-        console.log("URLデータの復元に失敗しました");
+      const parsed = JSON.parse(decodeURIComponent(atob(encoded)));
+      if (parsed.totalBudget) setTotalBudget(String(parsed.totalBudget));
+      if (typeof parsed.roundNumbers === "boolean") setRoundNumbers(parsed.roundNumbers);
+      if (Array.isArray(parsed.measures) && parsed.measures.length > 0) {
+        setMeasures(
+          parsed.measures.map((item, index) => ({
+            id: index + 1,
+            name: item.name || "施策",
+            sessions: String(item.sessions || "0"),
+            cvr: String(item.cvr || "0"),
+            revenuePerCv: String(item.revenuePerCv || "0"),
+            budgetShare: String(item.budgetShare || "0"),
+          }))
+        );
       }
+    } catch (error) {
+      console.error("URLデータの読み込みに失敗しました", error);
     }
   }, []);
 
-  const calculated = useMemo(() => {
-    return influencers.map((item) => {
-      const conversions = item.views * (item.cvr / 100);
-      const sales = conversions * item.averageOrderValue;
-      const profit = sales - item.cost;
-      const roi = item.cost > 0 ? (profit / item.cost) * 100 : 0;
-      const cpa = conversions > 0 ? item.cost / conversions : 0;
-      const engagement = item.views * (item.engagementRate / 100);
-
-      let rank = "C";
-      if (roi >= 100 && cpa <= item.averageOrderValue * 0.4) rank = "A";
-      else if (roi >= 0) rank = "B";
-
-      return {
-        ...item,
-        conversions,
-        sales,
-        profit,
-        roi,
-        cpa,
-        engagement,
-        rank,
-      };
-    });
-  }, [influencers]);
-
-  const summary = useMemo(() => {
-    const totalSales = calculated.reduce((sum, item) => sum + item.sales, 0);
-    const totalProfit = calculated.reduce((sum, item) => sum + item.profit, 0);
-    const totalCost = calculated.reduce((sum, item) => sum + item.cost, 0);
-
-    const averageROI =
-      calculated.length > 0
-        ? calculated.reduce((sum, item) => sum + item.roi, 0) /
-          calculated.length
-        : 0;
-
-    const averageCPA =
-      calculated.length > 0
-        ? calculated.reduce((sum, item) => sum + item.cpa, 0) /
-          calculated.length
-        : 0;
-
-    return { totalSales, totalProfit, totalCost, averageROI, averageCPA };
-  }, [calculated]);
-
-  const bestInfluencer = useMemo(() => {
-    if (calculated.length === 0) return null;
-    return [...calculated].sort((a, b) => b.roi - a.roi)[0];
-  }, [calculated]);
-
-  const pieData = calculated.map((item) => ({
-    name: item.name,
-    value: item.cost,
-  }));
-
-  const updateInfluencer = (id, key, value) => {
-    setInfluencers((prev) =>
+  const updateMeasure = (id, key, value) => {
+    setMeasures((prev) =>
       prev.map((item) =>
         item.id === id
           ? {
               ...item,
-              [key]: key === "name" || key === "sns" ? value : Number(value),
+              [key]: key === "name" ? value : sanitizeNumber(value),
             }
           : item
       )
     );
   };
 
-  const addInfluencer = () => {
-    setInfluencers((prev) => [
+  const addMeasure = () => {
+    const nextId = Math.max(...measures.map((item) => item.id), 0) + 1;
+    setMeasures((prev) => [
       ...prev,
       {
-        id: Date.now(),
-        name: `インフルエンサー${prev.length + 1}`,
-        sns: "Instagram",
-        followers: 10000,
-        views: 5000,
-        engagementRate: 3,
-        cost: 100000,
-        cvr: 1,
-        averageOrderValue: 30000,
+        id: nextId,
+        name: "新規施策",
+        sessions: "0",
+        cvr: "0",
+        revenuePerCv: "0",
+        budgetShare: "0",
       },
     ]);
   };
 
-  const deleteInfluencer = (id) => {
-    setInfluencers((prev) => prev.filter((item) => item.id !== id));
+  const removeMeasure = (id) => {
+    setMeasures((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const exportCSV = () => {
-    const header = [
-      "名前",
-      "SNS",
-      "フォロワー数",
-      "平均再生数",
-      "エンゲージメント率",
-      "費用",
-      "CVR",
-      "客単価",
-      "CV数",
-      "売上",
-      "利益",
-      "CPA",
-      "ROI",
-      "判定",
-    ];
+  const results = useMemo(() => {
+    return measures.map((item) => {
+      const sessions = toNumber(item.sessions);
+      const cvr = toNumber(item.cvr);
+      const revenuePerCv = toNumber(item.revenuePerCv);
+      const budgetShare = toNumber(item.budgetShare);
+      const cost = toNumber(totalBudget) * (budgetShare / 100);
 
-    const rows = calculated.map((item) => [
+      const rawCv = sessions * (cvr / 100);
+      const cv = roundNumbers ? Math.round(rawCv) : Number(rawCv.toFixed(2));
+      const revenue = cv * revenuePerCv;
+      const profit = revenue - cost;
+      const cpa = cv > 0 ? cost / cv : 0;
+      const roi = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
+      const roas = cost > 0 ? (revenue / cost) * 100 : 0;
+
+      return {
+        ...item,
+        sessions,
+        cvr,
+        revenuePerCv,
+        budgetShare,
+        cost,
+        cv,
+        revenue,
+        profit,
+        cpa,
+        roi,
+        roas,
+      };
+    });
+  }, [measures, roundNumbers, totalBudget]);
+
+  const bestRoi = useMemo(() => [...results].sort((a, b) => b.roi - a.roi)[0], [results]);
+  const bestCv = useMemo(() => [...results].sort((a, b) => b.cv - a.cv)[0], [results]);
+  const bestCpa = useMemo(() => {
+    return [...results]
+      .filter((item) => item.cv > 0)
+      .sort((a, b) => a.cpa - b.cpa)[0];
+  }, [results]);
+
+  const worstRoi = useMemo(() => [...results].sort((a, b) => a.roi - b.roi)[0], [results]);
+
+  const totalCost = results.reduce((sum, item) => sum + item.cost, 0);
+  const totalRevenue = results.reduce((sum, item) => sum + item.revenue, 0);
+  const totalCv = results.reduce((sum, item) => sum + item.cv, 0);
+  const totalProfit = totalRevenue - totalCost;
+  const totalRoi = totalCost > 0 ? ((totalRevenue - totalCost) / totalCost) * 100 : 0;
+  const totalBudgetShare = results.reduce((sum, item) => sum + item.budgetShare, 0);
+
+  const optimizationSuggestion = useMemo(() => {
+    if (!bestRoi || !worstRoi) return "施策データを入力すると、予算配分の提案が表示されます。";
+    if (results.length < 2) return "複数施策を入力すると、予算配分の比較提案ができます。";
+    if (bestRoi.id === worstRoi.id) return "施策間の差がまだ小さいため、CVR・費用・1CVあたり売上を調整して比較してください。";
+    if (bestRoi.roi <= 0) return "現状ではROIがプラスの施策がないため、CVR改善・費用削減・単価改善を優先してください。";
+
+    return `${bestRoi.name} はROIが最も高いため、${worstRoi.name} から5〜10%程度の予算を移して検証する価値があります。`;
+  }, [bestRoi, worstRoi, results]);
+
+  const optimizedAllocation = useMemo(() => {
+    if (!bestRoi || !worstRoi || results.length < 2 || bestRoi.id === worstRoi.id) return results;
+
+    return results.map((item) => {
+      if (item.id === bestRoi.id) {
+        return { ...item, recommendedShare: Math.min(100, item.budgetShare + 10) };
+      }
+      if (item.id === worstRoi.id) {
+        return { ...item, recommendedShare: Math.max(0, item.budgetShare - 10) };
+      }
+      return { ...item, recommendedShare: item.budgetShare };
+    });
+  }, [results, bestRoi, worstRoi]);
+
+  const formatTooltip = (value, name) => {
+    if (name === "roi") return [Number(value).toFixed(1) + "%", "ROI"];
+    if (name === "cpa") return [yen(value), "CPA"];
+    if (name === "cv") return [roundNumbers ? Math.round(value) + "件" : comma(value) + "件", "CV数"];
+    if (name === "cost") return [yen(value), "費用"];
+    return [value, name];
+  };
+
+  const downloadPdf = () => window.print();
+
+  const reset = () => {
+    setMeasures(initialMeasures);
+    setRoundNumbers(true);
+    setTotalBudget("1000000");
+    setActiveTab("summary");
+    setShareMessage("");
+  };
+
+  const downloadCsv = () => {
+    const header = ["施策", "流入数", "CVR", "CV数", "予算配分", "費用", "CPA", "売上", "利益", "ROI", "ROAS"];
+    const rows = results.map((item) => [
       item.name,
-      item.sns,
-      item.followers,
-      item.views,
-      item.engagementRate,
-      item.cost,
-      item.cvr,
-      item.averageOrderValue,
-      item.conversions.toFixed(1),
-      Math.round(item.sales),
-      Math.round(item.profit),
+      item.sessions,
+      item.cvr + "%",
+      roundNumbers ? Math.round(item.cv) : item.cv,
+      item.budgetShare + "%",
+      Math.round(item.cost),
       Math.round(item.cpa),
-      item.roi.toFixed(1),
-      item.rank,
+      Math.round(item.revenue),
+      Math.round(item.profit),
+      item.roi.toFixed(1) + "%",
+      item.roas.toFixed(1) + "%",
     ]);
 
-    const csv = [header, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], {
-      type: "text/csv;charset=utf-8;",
-    });
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\\n");
 
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "influencer-roi-simulation.csv";
-    a.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "marketing-roi-comparison.csv";
+    link.click();
     URL.revokeObjectURL(url);
   };
 
-  const importCSV = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const text = e.target.result;
-      const lines = text.split(/\r?\n/).filter(Boolean);
-      const body = lines.slice(1);
-
-      const imported = body.map((line, index) => {
-        const cols = line.split(",");
-
-        return {
-          id: Date.now() + index,
-          name: cols[0] || `インフルエンサー${index + 1}`,
-          sns: cols[1] || "Instagram",
-          followers: Number(cols[2]) || 0,
-          views: Number(cols[3]) || 0,
-          engagementRate: Number(cols[4]) || 0,
-          cost: Number(cols[5]) || 0,
-          cvr: Number(cols[6]) || 0,
-          averageOrderValue: Number(cols[7]) || 0,
-        };
-      });
-
-      setInfluencers(imported);
+  const createShareUrl = async () => {
+    const payload = {
+      totalBudget,
+      roundNumbers,
+      measures: measures.map(({ name, sessions, cvr, revenuePerCv, budgetShare }) => ({
+        name,
+        sessions,
+        cvr,
+        revenuePerCv,
+        budgetShare,
+      })),
     };
 
-    reader.readAsText(file);
-  };
-
-  const shareURL = async () => {
-    const encoded = btoa(encodeURIComponent(JSON.stringify(influencers)));
+    const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
     const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
 
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareMessage("共有URLをコピーしました");
+    } catch {
+      setShareMessage(url);
+    }
   };
-
-  const printPDF = () => {
-    window.print();
-  };
-
-  const aiComments = useMemo(() => {
-    if (!bestInfluencer) return [];
-
-    const worstCpa = [...calculated].sort((a, b) => b.cpa - a.cpa)[0];
-    const bestCpa = [...calculated].sort((a, b) => a.cpa - b.cpa)[0];
-    const highCost = [...calculated].sort((a, b) => b.cost - a.cost)[0];
-
-    return [
-      `現時点では「${bestInfluencer.name}」が最もROIが高い候補です。`,
-      `CPA効率では「${bestCpa.name}」が優秀です。`,
-      `「${highCost.name}」は費用が最も高いため、実施前に想定CVRの妥当性確認がおすすめです。`,
-      worstCpa?.roi < 0
-        ? `「${worstCpa.name}」は利益がマイナスになる可能性があるため、費用交渉または見送り候補です。`
-        : `全体として、費用・再生数・CVRのバランスを見ながら選定するのが安全です。`,
-    ];
-  }, [calculated, bestInfluencer]);
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Influencer ROI Simulator</h1>
-          <p style={styles.subtitle}>
-            SNSインフルエンサー施策の費用対効果を比較できます。
-          </p>
-        </div>
-
-        <div style={styles.actions}>
-          <label style={styles.secondaryButton}>
-            CSV読込
-            <input
-              type="file"
-              accept=".csv"
-              onChange={importCSV}
-              style={{ display: "none" }}
-            />
-          </label>
-          <button style={styles.secondaryButton} onClick={exportCSV}>
-            CSV出力
-          </button>
-          <button style={styles.secondaryButton} onClick={printPDF}>
-            PDF保存
-          </button>
-          <button style={styles.primaryButton} onClick={shareURL}>
-            {copied ? "コピー済み" : "URL共有"}
-          </button>
-        </div>
-      </div>
-
-      <div style={styles.kpiGrid}>
-        <Kpi title="総売上" value={formatYen(summary.totalSales)} />
-        <Kpi
-          title="総利益"
-          value={formatYen(summary.totalProfit)}
-          danger={summary.totalProfit < 0}
-        />
-        <Kpi title="平均ROI" value={`${summary.averageROI.toFixed(1)}%`} />
-        <Kpi title="平均CPA" value={formatYen(summary.averageCPA)} />
-      </div>
-
-      {bestInfluencer && (
-        <div style={styles.bestCard}>
+    <main style={styles.page}>
+      <style>{printAndResponsiveCss}</style>
+      <div style={styles.container}>
+        <header style={styles.header}>
           <div>
-            <p style={styles.label}>おすすめ候補</p>
-            <h2 style={styles.bestName}>{bestInfluencer.name}</h2>
-            <p style={styles.bestText}>
-              ROIが最も高く、想定利益は {formatYen(bestInfluencer.profit)}{" "}
-              です。
+            <p style={styles.sub}>Web Marketing ROI Tool</p>
+            <h1 style={styles.title}>Webマーケティング施策比較ROIシミュレーター</h1>
+            <p style={styles.text}>
+              SEO、広告、SNSなど複数施策のCVR・CV数・CPA・ROIを比較し、費用対効果の高い施策を見極めます。
             </p>
           </div>
-          <div style={styles.rankBadge}>Rank {bestInfluencer.rank}</div>
-        </div>
-      )}
+          <div style={styles.actionArea} className="no-print">
+            <button onClick={downloadPdf} style={styles.primaryButton}>PDF出力</button>
+            <button onClick={downloadCsv} style={styles.button}>CSV出力</button>
+            <button onClick={createShareUrl} style={styles.button}>URL共有</button>
+            <button onClick={reset} style={styles.button}>初期値に戻す</button>
+          </div>
+        </header>
 
-      <div style={styles.card}>
-        <div style={styles.cardHeader}>
-          <h2 style={styles.sectionTitle}>インフルエンサー入力</h2>
-          <button style={styles.primaryButton} onClick={addInfluencer}>
-            ＋ 追加
-          </button>
-        </div>
+        {shareMessage && <p style={styles.shareMessage}>{shareMessage}</p>}
 
-        <div style={styles.inputGrid}>
-          {influencers.map((item) => (
-            <div key={item.id} style={styles.inputCard}>
-              <div style={styles.inputCardHeader}>
-                <input
-                  style={styles.nameInput}
-                  value={item.name}
-                  onChange={(e) =>
-                    updateInfluencer(item.id, "name", e.target.value)
-                  }
-                />
-                <button
-                  style={styles.deleteButton}
-                  onClick={() => deleteInfluencer(item.id)}
-                >
-                  削除
-                </button>
+        <nav style={styles.tabNav} className="no-print">
+          <TabButton active={activeTab === "summary"} onClick={() => setActiveTab("summary")}>概要</TabButton>
+          <TabButton active={activeTab === "input"} onClick={() => setActiveTab("input")}>入力</TabButton>
+          <TabButton active={activeTab === "charts"} onClick={() => setActiveTab("charts")}>グラフ</TabButton>
+          <TabButton active={activeTab === "table"} onClick={() => setActiveTab("table")}>比較表</TabButton>
+        </nav>
+
+        {(activeTab === "summary" || activeTab === "input" || activeTab === "charts" || activeTab === "table") && (
+          <section style={styles.summaryGrid}>
+            <Summary title="合計CV数" value={roundNumbers ? Math.round(totalCv) + "件" : comma(totalCv) + "件"} />
+            <Summary title="合計費用" value={yen(totalCost)} />
+            <Summary title="合計売上" value={yen(totalRevenue)} />
+            <Summary title="合計利益" value={yen(totalProfit)} negative={totalProfit < 0} />
+            <Summary title="合計ROI" value={totalRoi.toFixed(1) + "%"} negative={totalRoi < 0} />
+          </section>
+        )}
+
+        {activeTab === "summary" && (
+          <>
+            <section style={styles.insightGrid}>
+              <InsightCard
+                title="ROIが最も高い施策"
+                name={bestRoi?.name || "-"}
+                detail={bestRoi ? `ROI ${bestRoi.roi.toFixed(1)}% / 利益 ${yen(bestRoi.profit)}` : "-"}
+              />
+              <InsightCard
+                title="CV数が最も多い施策"
+                name={bestCv?.name || "-"}
+                detail={bestCv ? `${roundNumbers ? Math.round(bestCv.cv) : comma(bestCv.cv)}件 / CVR ${bestCv.cvr}%` : "-"}
+              />
+              <InsightCard
+                title="CPAが最も低い施策"
+                name={bestCpa?.name || "-"}
+                detail={bestCpa ? `CPA ${yen(bestCpa.cpa)} / 費用 ${yen(bestCpa.cost)}` : "CVがある施策なし"}
+              />
+            </section>
+
+            <section style={styles.card}>
+              <h2 style={styles.cardTitle}>自動最適化提案</h2>
+              <p style={styles.recommendation}>{optimizationSuggestion}</p>
+              <div style={styles.tableScroll}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <Th>施策</Th>
+                      <Th>現在の配分</Th>
+                      <Th>推奨配分</Th>
+                      <Th>ROI</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {optimizedAllocation.map((item) => (
+                      <tr key={item.id}>
+                        <Td strong>{item.name}</Td>
+                        <Td>{comma(item.budgetShare)}%</Td>
+                        <Td>{comma(item.recommendedShare ?? item.budgetShare)}%</Td>
+                        <Td negative={item.roi < 0}>{item.roi.toFixed(1)}%</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            </section>
+          </>
+        )}
 
-              <Field label="SNS">
-                <select
-                  style={styles.input}
-                  value={item.sns}
-                  onChange={(e) =>
-                    updateInfluencer(item.id, "sns", e.target.value)
-                  }
-                >
-                  <option>Instagram</option>
-                  <option>TikTok</option>
-                  <option>YouTube</option>
-                  <option>X</option>
-                </select>
-              </Field>
+        {activeTab === "input" && (
+          <InputSection
+            measures={measures}
+            totalBudget={totalBudget}
+            setTotalBudget={setTotalBudget}
+            totalBudgetShare={totalBudgetShare}
+            updateMeasure={updateMeasure}
+            removeMeasure={removeMeasure}
+            addMeasure={addMeasure}
+            roundNumbers={roundNumbers}
+            setRoundNumbers={setRoundNumbers}
+            comma={comma}
+          />
+        )}
 
-              <Field label="フォロワー数">
-                <input
-                  style={styles.input}
-                  type="number"
-                  value={item.followers}
-                  onChange={(e) =>
-                    updateInfluencer(item.id, "followers", e.target.value)
-                  }
-                />
-              </Field>
+        {activeTab === "charts" && (
+          <ChartsSection
+            results={results}
+            formatTooltip={formatTooltip}
+            roundNumbers={roundNumbers}
+            comma={comma}
+            yen={yen}
+          />
+        )}
 
-              <Field label="平均再生数 / 表示回数">
-                <input
-                  style={styles.input}
-                  type="number"
-                  value={item.views}
-                  onChange={(e) =>
-                    updateInfluencer(item.id, "views", e.target.value)
-                  }
-                />
-              </Field>
-
-              <Field label="エンゲージメント率（%）">
-                <input
-                  style={styles.input}
-                  type="number"
-                  value={item.engagementRate}
-                  onChange={(e) =>
-                    updateInfluencer(
-                      item.id,
-                      "engagementRate",
-                      e.target.value
-                    )
-                  }
-                />
-              </Field>
-
-              <Field label="投稿費用（円）">
-                <input
-                  style={styles.input}
-                  type="number"
-                  value={item.cost}
-                  onChange={(e) =>
-                    updateInfluencer(item.id, "cost", e.target.value)
-                  }
-                />
-              </Field>
-
-              <Field label="想定CVR（%）">
-                <input
-                  style={styles.input}
-                  type="number"
-                  value={item.cvr}
-                  onChange={(e) =>
-                    updateInfluencer(item.id, "cvr", e.target.value)
-                  }
-                />
-              </Field>
-
-              <Field label="客単価（円）">
-                <input
-                  style={styles.input}
-                  type="number"
-                  value={item.averageOrderValue}
-                  onChange={(e) =>
-                    updateInfluencer(
-                      item.id,
-                      "averageOrderValue",
-                      e.target.value
-                    )
-                  }
-                />
-              </Field>
-            </div>
-          ))}
-        </div>
+        {activeTab === "table" && (
+          <TableSection
+            results={results}
+            roundNumbers={roundNumbers}
+            comma={comma}
+            yen={yen}
+          />
+        )}
       </div>
-
-      <div style={styles.twoColumn}>
-        <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>ROI比較グラフ</h2>
-          <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer>
-              <BarChart data={calculated}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="roi" fill={BLUE} radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>費用割合</h2>
-          <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  outerRadius={105}
-                  label
-                >
-                  {pieData.map((_, index) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatYen(value)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>比較表</h2>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                {[
-                  "名前",
-                  "SNS",
-                  "再生数",
-                  "費用",
-                  "CV数",
-                  "売上",
-                  "利益",
-                  "CPA",
-                  "ROI",
-                  "判定",
-                ].map((head) => (
-                  <th key={head} style={styles.th}>
-                    {head}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {calculated.map((item) => (
-                <tr key={item.id}>
-                  <td style={styles.td}>{item.name}</td>
-                  <td style={styles.td}>{item.sns}</td>
-                  <td style={styles.td}>{formatNumber(item.views)}</td>
-                  <td style={styles.td}>{formatYen(item.cost)}</td>
-                  <td style={styles.td}>{formatNumber(item.conversions)}</td>
-                  <td style={styles.td}>{formatYen(item.sales)}</td>
-                  <td
-                    style={{
-                      ...styles.td,
-                      color: item.profit < 0 ? "#991b1b" : "#0f172a",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {formatYen(item.profit)}
-                  </td>
-                  <td style={styles.td}>{formatYen(item.cpa)}</td>
-                  <td style={styles.td}>{item.roi.toFixed(1)}%</td>
-                  <td style={styles.td}>
-                    <span style={styles.smallBadge}>Rank {item.rank}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>AI分析コメント</h2>
-        <ul style={styles.commentList}>
-          {aiComments.map((comment, index) => (
-            <li key={index}>{comment}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
+    </main>
   );
 }
 
-function Kpi({ title, value, danger }) {
+function InputSection({ measures, totalBudget, setTotalBudget, totalBudgetShare, updateMeasure, removeMeasure, addMeasure, roundNumbers, setRoundNumbers, comma }) {
   return (
-    <div style={styles.kpiCard}>
-      <p style={styles.kpiLabel}>{title}</p>
-      <h2
-        style={{
-          ...styles.kpiValue,
-          color: danger ? "#991b1b" : "#0f172a",
-        }}
-      >
-        {value}
-      </h2>
+    <section style={styles.card}>
+      <div style={styles.cardHeader}>
+        <div>
+          <h2 style={styles.cardTitle}>施策別入力</h2>
+          <p style={styles.smallText}>総予算、流入数、CVR、予算配分、1CVあたり売上を入力してください。</p>
+          <div style={styles.budgetBox}>
+            <Field label="総予算" value={totalBudget} onChange={setTotalBudget} suffix="円" />
+            <p style={{ ...styles.budgetShareText, ...(totalBudgetShare !== 100 ? styles.warningText : {}) }}>
+              予算配分合計：{comma(totalBudgetShare)}%{totalBudgetShare !== 100 ? "（100%になるように調整してください）" : ""}
+            </p>
+          </div>
+        </div>
+        <div style={styles.optionArea} className="no-print">
+          <label style={styles.checkboxRow}>
+            <input type="checkbox" checked={roundNumbers} onChange={(e) => setRoundNumbers(e.target.checked)} />
+            <span>CV数を四捨五入</span>
+          </label>
+          <button onClick={addMeasure} style={styles.button}>施策を追加</button>
+        </div>
+      </div>
+
+      <div style={styles.inputList}>
+        {measures.map((item) => (
+          <div key={item.id} style={styles.measureBox} className="hover-card">
+            <div style={styles.measureHeader}>
+              <input value={item.name} onChange={(e) => updateMeasure(item.id, "name", e.target.value)} style={styles.measureNameInput} />
+              {measures.length > 1 && (
+                <button onClick={() => removeMeasure(item.id)} style={styles.deleteButton} className="no-print">削除</button>
+              )}
+            </div>
+            <div style={styles.fieldGrid}>
+              <Field label="流入数" value={item.sessions} onChange={(value) => updateMeasure(item.id, "sessions", value)} suffix="PV" />
+              <Field label="CVR" value={item.cvr} onChange={(value) => updateMeasure(item.id, "cvr", value)} suffix="%" />
+              <Field label="予算配分" value={item.budgetShare} onChange={(value) => updateMeasure(item.id, "budgetShare", value)} suffix="%" />
+              <div style={styles.sliderField}>
+                <span style={styles.label}>予算配分スライダー</span>
+                <input type="range" min="0" max="100" value={item.budgetShare || "0"} onChange={(e) => updateMeasure(item.id, "budgetShare", e.target.value)} style={styles.range} />
+              </div>
+              <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ChartsSection({ results, formatTooltip, roundNumbers, comma, yen }) {
+  return (
+    <section style={styles.card}>
+      <h2 style={styles.cardTitle}>グラフ分析</h2>
+      <ChartBlock title="ROI比較" data={results} dataKey="roi" tooltipFormatter={formatTooltip} labelFormatter={(v) => Number(v).toFixed(0) + "%"} />
+      <ChartBlock title="CPA比較" data={results} dataKey="cpa" tooltipFormatter={formatTooltip} labelFormatter={(v) => yen(v)} />
+      <ChartBlock title="CV数比較" data={results} dataKey="cv" tooltipFormatter={formatTooltip} labelFormatter={(v) => (roundNumbers ? Math.round(v) + "件" : comma(v) + "件")} />
+
+      <div style={styles.chartBlock}>
+        <h3 style={styles.graphTitle}>施策別費用割合</h3>
+        <div style={styles.pieBox}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={results} dataKey="cost" nameKey="name" outerRadius={130} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                {results.map((entry, index) => <Cell key={`cell-${entry.id}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+              </Pie>
+              <Tooltip formatter={(value) => yen(value)} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TableSection({ results, roundNumbers, comma, yen }) {
+  return (
+    <section style={styles.card}>
+      <h2 style={styles.cardTitle}>施策比較結果</h2>
+      <div style={styles.tableScroll}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <Th>施策</Th>
+              <Th>流入数</Th>
+              <Th>CVR</Th>
+              <Th>CV数</Th>
+              <Th>予算配分</Th>
+              <Th>費用</Th>
+              <Th>CPA</Th>
+              <Th>売上</Th>
+              <Th>利益</Th>
+              <Th>ROI</Th>
+              <Th>ROAS</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.slice().sort((a, b) => b.roi - a.roi).map((item, index) => (
+              <tr key={item.id} style={index === 0 ? styles.bestRow : undefined}>
+                <Td strong>{item.name}</Td>
+                <Td>{comma(item.sessions)}</Td>
+                <Td>{item.cvr}%</Td>
+                <Td>{roundNumbers ? Math.round(item.cv) : comma(item.cv)}</Td>
+                <Td>{comma(item.budgetShare)}%</Td>
+                <Td>{yen(item.cost)}</Td>
+                <Td>{yen(item.cpa)}</Td>
+                <Td>{yen(item.revenue)}</Td>
+                <Td negative={item.profit < 0}>{yen(item.profit)}</Td>
+                <Td negative={item.roi < 0}>{item.roi.toFixed(1)}%</Td>
+                <Td>{item.roas.toFixed(1)}%</Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p style={styles.note}>※ 表はROIが高い順に並びます。1行目が費用対効果の最も高い施策です。</p>
+    </section>
+  );
+}
+
+function ChartBlock({ title, data, dataKey, tooltipFormatter, labelFormatter }) {
+  return (
+    <div style={styles.chartBlock}>
+      <h3 style={styles.graphTitle}>{title}</h3>
+      <div style={styles.chartBox}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 28, right: 20, left: 10, bottom: 8 }}>
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip formatter={tooltipFormatter} />
+            <Bar dataKey={dataKey} fill={BAR_COLOR} radius={[8, 8, 0, 0]} isAnimationActive>
+              <LabelList dataKey={dataKey} position="top" formatter={labelFormatter} style={{ fontSize: 12, fontWeight: 700 }} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, value, onChange, suffix = "" }) {
+  const sanitizeNumber = (inputValue) => {
+    const raw = String(inputValue).replace(/,/g, "");
+    const cleaned = raw.replace(/[^0-9.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length <= 2) return cleaned;
+    return parts[0] + "." + parts.slice(1).join("");
+  };
+
+  const handleFocus = () => {
+    if (value === "0") onChange("");
+  };
+
+  const handleBlur = () => {
+    if (value === "") onChange("0");
+  };
+
   return (
     <label style={styles.field}>
-      <span style={styles.fieldLabel}>{label}</span>
-      {children}
+      <span style={styles.label}>{label}</span>
+      <div style={styles.inputRow}>
+        <input type="text" inputMode="decimal" value={value} onChange={(e) => onChange(sanitizeNumber(e.target.value))} onFocus={handleFocus} onBlur={handleBlur} style={styles.input} />
+        <span style={styles.suffix}>{suffix}</span>
+      </div>
     </label>
   );
+}
+
+function TabButton({ active, onClick, children }) {
+  return <button onClick={onClick} style={{ ...styles.tabButton, ...(active ? styles.tabButtonActive : {}) }}>{children}</button>;
+}
+
+function Summary({ title, value, negative = false }) {
+  return (
+    <div style={styles.summaryCard} className="hover-card">
+      <p style={styles.summaryTitle}>{title}</p>
+      <p style={{ ...styles.summaryValue, ...(negative ? styles.negativeText : {}) }}>{value}</p>
+    </div>
+  );
+}
+
+function InsightCard({ title, name, detail }) {
+  return (
+    <div style={styles.insightCard} className="hover-card-dark">
+      <p style={styles.summaryTitle}>{title}</p>
+      <p style={styles.insightName}>{name}</p>
+      <p style={styles.insightDetail}>{detail}</p>
+    </div>
+  );
+}
+
+function Th({ children }) {
+  return <th style={styles.th}>{children}</th>;
+}
+
+function Td({ children, negative = false, strong = false }) {
+  return <td style={{ ...styles.td, ...(negative ? styles.negativeText : {}), fontWeight: strong ? 800 : undefined }}>{children}</td>;
 }
 
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#f3f6fb",
-    padding: "28px",
+    background: "#f6f7fb",
     color: "#0f172a",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", Meiryo, sans-serif',
+    padding: "32px 16px",
   },
-  header: {
-    marginBottom: "24px",
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "16px",
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-  },
-  title: {
-    fontSize: "30px",
-    fontWeight: 800,
-    margin: 0,
-  },
-  subtitle: {
-    color: "#64748b",
-    marginTop: "8px",
-  },
-  actions: {
-    display: "flex",
-    gap: "10px",
-    flexWrap: "wrap",
-  },
-  primaryButton: {
-    background: BLUE,
-    color: "#fff",
-    border: "none",
-    borderRadius: "12px",
-    padding: "10px 16px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    background: "#fff",
-    color: "#0f172a",
-    border: "1px solid #cbd5e1",
-    borderRadius: "12px",
-    padding: "10px 16px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  kpiGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "18px",
-    marginBottom: "24px",
-  },
-  kpiCard: {
-    background: "#ffffff",
-    borderRadius: "20px",
-    padding: "22px",
-    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
-    border: "1px solid #e2e8f0",
-  },
-  kpiLabel: {
-    margin: 0,
-    fontSize: "13px",
-    color: "#64748b",
-    fontWeight: 700,
-  },
-  kpiValue: {
-    margin: "10px 0 0",
-    fontSize: "30px",
-    fontWeight: 800,
-  },
-  bestCard: {
-    background: "linear-gradient(135deg, #1d4ed8, #2563eb)",
-    color: "#fff",
-    borderRadius: "22px",
-    padding: "24px",
-    marginBottom: "24px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "16px",
-    boxShadow: "0 12px 28px rgba(29,78,216,0.25)",
-  },
-  label: {
-    margin: 0,
-    opacity: 0.85,
-    fontSize: "13px",
-  },
-  bestName: {
-    margin: "6px 0",
-    fontSize: "26px",
-  },
-  bestText: {
-    margin: 0,
-  },
-  rankBadge: {
-    background: "#fff",
-    color: BLUE,
-    padding: "12px 18px",
-    borderRadius: "999px",
-    fontWeight: 800,
-    whiteSpace: "nowrap",
-  },
-  card: {
-    background: "#fff",
-    borderRadius: "22px",
-    padding: "24px",
-    marginBottom: "24px",
-    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "20px",
-  },
-  sectionTitle: {
-    fontSize: "20px",
-    margin: "0 0 18px",
-  },
-  inputGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-    gap: "18px",
-  },
-  inputCard: {
-    border: "1px solid #e2e8f0",
-    borderRadius: "18px",
-    padding: "18px",
-    background: "#f8fafc",
-  },
-  inputCardHeader: {
-    display: "flex",
-    gap: "8px",
-    marginBottom: "14px",
-  },
-  nameInput: {
-    flex: 1,
-    padding: "10px",
-    borderRadius: "10px",
-    border: "1px solid #cbd5e1",
-    fontWeight: 700,
-  },
-  deleteButton: {
-    border: "none",
-    borderRadius: "10px",
-    background: "#fee2e2",
-    color: "#991b1b",
-    padding: "8px 10px",
-    cursor: "pointer",
-    fontWeight: 700,
-  },
-  field: {
-    display: "block",
-    marginBottom: "12px",
-  },
-  fieldLabel: {
-    display: "block",
-    fontSize: "13px",
-    color: "#475569",
-    marginBottom: "5px",
-    fontWeight: 700,
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "10px",
-    borderRadius: "10px",
-    border: "1px solid #cbd5e1",
-    background: "#fff",
-  },
-  twoColumn: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-    gap: "24px",
-  },
-  tableWrap: {
-    overflowX: "auto",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "14px",
-    minWidth: "900px",
-  },
-  th: {
-    textAlign: "left",
-    padding: "12px",
-    borderBottom: "1px solid #e2e8f0",
-    color: "#475569",
-    fontSize: "13px",
-    whiteSpace: "nowrap",
-  },
-  td: {
-    padding: "12px",
-    borderBottom: "1px solid #e2e8f0",
-    whiteSpace: "nowrap",
-  },
-  smallBadge: {
-    background: "#dbeafe",
-    color: BLUE,
-    padding: "6px 10px",
-    borderRadius: "999px",
-    fontWeight: 800,
-  },
-  commentList: {
-    lineHeight: 1.9,
-    color: "#334155",
-    paddingLeft: "20px",
-  },
+  container: { maxWidth: "1200px", margin: "0 auto" },
+  header: { display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 18 },
+  sub: { margin: 0, color: "#64748b", fontWeight: 700 },
+  title: { margin: "8px 0", fontSize: "clamp(30px, 5vw, 42px)", lineHeight: 1.2 },
+  text: { margin: 0, color: "#64748b", lineHeight: 1.7, maxWidth: 760 },
+  actionArea: { display: "flex", gap: 10, flexWrap: "wrap" },
+  button: { border: "1px solid #cbd5e1", background: "white", borderRadius: 12, padding: "12px 18px", cursor: "pointer", fontWeight: 700 },
+  primaryButton: { border: "1px solid #0f172a", background: "#0f172a", color: "white", borderRadius: 12, padding: "12px 18px", cursor: "pointer", fontWeight: 700 },
+  deleteButton: { border: "1px solid #fecaca", background: "#fff1f2", color: "#9f1239", borderRadius: 10, padding: "8px 12px", cursor: "pointer", fontWeight: 700 },
+  shareMessage: { margin: "0 0 16px", color: "#1d4ed8", fontWeight: 800 },
+  tabNav: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 },
+  tabButton: { border: "1px solid #cbd5e1", background: "white", color: "#334155", borderRadius: 999, padding: "10px 16px", cursor: "pointer", fontWeight: 800 },
+  tabButtonActive: { background: BAR_COLOR, borderColor: BAR_COLOR, color: "white" },
+  summaryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 18 },
+  summaryCard: { background: "white", borderRadius: 20, padding: 22, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)", transition: "transform .2s ease, box-shadow .2s ease" },
+  summaryTitle: { margin: 0, color: "#64748b", fontWeight: 700, fontSize: 14 },
+  summaryValue: { margin: "10px 0 0", fontSize: "clamp(22px, 5vw, 28px)", fontWeight: 800 },
+  insightGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 24 },
+  insightCard: { background: "#0f172a", color: "white", borderRadius: 20, padding: 22, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.1)", transition: "transform .2s ease, box-shadow .2s ease" },
+  insightName: { margin: "10px 0 6px", fontSize: 24, fontWeight: 900 },
+  insightDetail: { margin: 0, color: "#cbd5e1", lineHeight: 1.6 },
+  negativeText: { color: "#9f1239", fontWeight: 800 },
+  warningText: { color: "#b45309", fontWeight: 800 },
+  card: { background: "white", borderRadius: 20, padding: 24, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)", marginBottom: 24, overflowX: "auto" },
+  cardHeader: { display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 18 },
+  cardTitle: { margin: "0 0 8px", fontSize: 22 },
+  smallText: { margin: 0, color: "#64748b", lineHeight: 1.6 },
+  recommendation: { margin: "0 0 18px", lineHeight: 1.9, fontSize: 17, fontWeight: 800, color: "#1d4ed8" },
+  budgetBox: { marginTop: 16, marginBottom: 20, maxWidth: 360 },
+  budgetShareText: { margin: "8px 0 0", fontSize: 13, color: "#64748b" },
+  optionArea: { display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" },
+  checkboxRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#475569", cursor: "pointer" },
+  inputList: { display: "grid", gap: 16 },
+  measureBox: { border: "1px solid #e2e8f0", borderRadius: 18, padding: 18, background: "#fbfdff", transition: "transform .2s ease, box-shadow .2s ease" },
+  measureHeader: { display: "flex", gap: 12, justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  measureNameInput: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "12px 12px", fontSize: 18, fontWeight: 800, boxSizing: "border-box" },
+  fieldGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 },
+  field: { display: "grid", gap: 8 },
+  sliderField: { display: "grid", gap: 8, alignSelf: "end" },
+  label: { color: "#475569", fontSize: 14, fontWeight: 700 },
+  inputRow: { display: "flex", gap: 8, alignItems: "center" },
+  input: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "12px 12px", fontSize: 16, boxSizing: "border-box" },
+  suffix: { width: 36, color: "#64748b", fontSize: 14 },
+  range: { width: "100%" },
+  chartBlock: { marginBottom: 42 },
+  graphTitle: { margin: "0 0 14px", fontSize: 18, fontWeight: 800 },
+  chartBox: { width: "100%", height: 340 },
+  pieBox: { width: "100%", height: 380 },
+  tableScroll: { width: "100%", overflowX: "auto" },
+  table: { width: "100%", minWidth: 980, borderCollapse: "collapse", fontSize: 14 },
+  th: { textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0", padding: 12, whiteSpace: "nowrap" },
+  td: { borderBottom: "1px solid #e2e8f0", padding: 12, whiteSpace: "nowrap" },
+  bestRow: { background: "#f0fdf4" },
+  note: { margin: "14px 0 0", color: "#64748b", fontSize: 13 },
 };
+
+const printAndResponsiveCss = `
+  * { box-sizing: border-box; }
+
+  .hover-card:hover,
+  .hover-card-dark:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14) !important;
+  }
+
+  @media (max-width: 768px) {
+    main { padding: 20px 12px !important; }
+    button { width: 100%; }
+  }
+
+  @media print {
+    body { background: #ffffff !important; }
+    main { background: #ffffff !important; padding: 0 !important; }
+    .no-print { display: none !important; }
+    div { box-shadow: none !important; }
+    table { font-size: 10px !important; }
+  }
+`;

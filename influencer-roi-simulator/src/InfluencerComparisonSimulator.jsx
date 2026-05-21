@@ -798,6 +798,7 @@ helpBox: {
   borderRadius: "16px",
   padding: "16px",
   marginTop: "14px",
+  color: "#0f172a",
 },
 
 helpTitle: {
@@ -809,7 +810,7 @@ helpTitle: {
 
 helpText: {
   margin: 0,
-  color: "#334155",
+  color: "#0f172a",
   lineHeight: 1.8,
   fontSize: "14px",
 },
@@ -918,6 +919,7 @@ helpText: {
     padding: "24px",
     marginBottom: "24px",
     boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+    color: "#0f172a",
   },
   cardHeader: {
     display: "flex",

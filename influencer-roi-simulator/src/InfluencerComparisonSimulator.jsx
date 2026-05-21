@@ -50,7 +50,6 @@ export default function InfluencerComparisonSimulator() {
   const [influencers, setInfluencers] = useState(initialInfluencers);
 
   const calculated = useMemo(() => {
-    const summary = useMemo(() => {
     return influencers.map((item) => {
       const conversions = item.views * (item.cvr / 100);
       const sales = conversions * item.averageOrderValue;
@@ -81,14 +80,39 @@ export default function InfluencerComparisonSimulator() {
     return [...calculated].sort((a, b) => b.roi - a.roi)[0];
   }, [calculated]);
 
+  const summary = useMemo(() => {
+    const totalSales = calculated.reduce((sum, item) => sum + item.sales, 0);
+    const totalProfit = calculated.reduce((sum, item) => sum + item.profit, 0);
+    const totalCost = calculated.reduce((sum, item) => sum + item.cost, 0);
+
+    const averageROI =
+      calculated.length > 0
+        ? calculated.reduce((sum, item) => sum + item.roi, 0) /
+          calculated.length
+        : 0;
+
+    const averageCPA =
+      calculated.length > 0
+        ? calculated.reduce((sum, item) => sum + item.cpa, 0) /
+          calculated.length
+        : 0;
+
+    return {
+      totalSales,
+      totalProfit,
+      totalCost,
+      averageROI,
+      averageCPA,
+    };
+  }, [calculated]);
+
   const updateInfluencer = (id, key, value) => {
     setInfluencers((prev) =>
       prev.map((item) =>
         item.id === id
           ? {
               ...item,
-              [key]:
-                key === "name" || key === "sns" ? value : Number(value),
+              [key]: key === "name" || key === "sns" ? value : Number(value),
             }
           : item
       )
@@ -125,13 +149,43 @@ export default function InfluencerComparisonSimulator() {
         </p>
       </div>
 
+      <div style={styles.kpiGrid}>
+        <div style={styles.kpiCard}>
+          <p style={styles.kpiLabel}>総売上</p>
+          <h2 style={styles.kpiValue}>{formatYen(summary.totalSales)}</h2>
+        </div>
+
+        <div style={styles.kpiCard}>
+          <p style={styles.kpiLabel}>総利益</p>
+          <h2
+            style={{
+              ...styles.kpiValue,
+              color: summary.totalProfit < 0 ? "#991b1b" : "#0f172a",
+            }}
+          >
+            {formatYen(summary.totalProfit)}
+          </h2>
+        </div>
+
+        <div style={styles.kpiCard}>
+          <p style={styles.kpiLabel}>平均ROI</p>
+          <h2 style={styles.kpiValue}>{summary.averageROI.toFixed(1)}%</h2>
+        </div>
+
+        <div style={styles.kpiCard}>
+          <p style={styles.kpiLabel}>平均CPA</p>
+          <h2 style={styles.kpiValue}>{formatYen(summary.averageCPA)}</h2>
+        </div>
+      </div>
+
       {bestInfluencer && (
         <div style={styles.bestCard}>
           <div>
             <p style={styles.label}>おすすめ候補</p>
             <h2 style={styles.bestName}>{bestInfluencer.name}</h2>
             <p style={styles.bestText}>
-              ROIが最も高く、想定利益は {formatYen(bestInfluencer.profit)} です。
+              ROIが最も高く、想定利益は {formatYen(bestInfluencer.profit)}{" "}
+              です。
             </p>
           </div>
           <div style={styles.rankBadge}>Rank {bestInfluencer.rank}</div>
@@ -279,38 +333,39 @@ export default function InfluencerComparisonSimulator() {
           <table style={styles.table}>
             <thead>
               <tr>
-                <th>名前</th>
-                <th>SNS</th>
-                <th>再生数</th>
-                <th>費用</th>
-                <th>CV数</th>
-                <th>売上</th>
-                <th>利益</th>
-                <th>CPA</th>
-                <th>ROI</th>
-                <th>判定</th>
+                <th style={styles.th}>名前</th>
+                <th style={styles.th}>SNS</th>
+                <th style={styles.th}>再生数</th>
+                <th style={styles.th}>費用</th>
+                <th style={styles.th}>CV数</th>
+                <th style={styles.th}>売上</th>
+                <th style={styles.th}>利益</th>
+                <th style={styles.th}>CPA</th>
+                <th style={styles.th}>ROI</th>
+                <th style={styles.th}>判定</th>
               </tr>
             </thead>
             <tbody>
               {calculated.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.name}</td>
-                  <td>{item.sns}</td>
-                  <td>{formatNumber(item.views)}</td>
-                  <td>{formatYen(item.cost)}</td>
-                  <td>{formatNumber(item.conversions)}</td>
-                  <td>{formatYen(item.sales)}</td>
+                  <td style={styles.td}>{item.name}</td>
+                  <td style={styles.td}>{item.sns}</td>
+                  <td style={styles.td}>{formatNumber(item.views)}</td>
+                  <td style={styles.td}>{formatYen(item.cost)}</td>
+                  <td style={styles.td}>{formatNumber(item.conversions)}</td>
+                  <td style={styles.td}>{formatYen(item.sales)}</td>
                   <td
                     style={{
+                      ...styles.td,
                       color: item.profit < 0 ? "#991b1b" : "#0f172a",
                       fontWeight: 700,
                     }}
                   >
                     {formatYen(item.profit)}
                   </td>
-                  <td>{formatYen(item.cpa)}</td>
-                  <td>{item.roi.toFixed(1)}%</td>
-                  <td>
+                  <td style={styles.td}>{formatYen(item.cpa)}</td>
+                  <td style={styles.td}>{item.roi.toFixed(1)}%</td>
+                  <td style={styles.td}>
                     <span style={styles.smallBadge}>Rank {item.rank}</span>
                   </td>
                 </tr>
@@ -350,8 +405,7 @@ const styles = {
     background: "#f3f6fb",
     padding: "28px",
     color: "#0f172a",
-    fontFamily:
-      "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   header: {
     marginBottom: "24px",
@@ -365,6 +419,31 @@ const styles = {
     color: "#64748b",
     marginTop: "8px",
   },
+  kpiGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "18px",
+    marginBottom: "24px",
+  },
+  kpiCard: {
+    background: "#ffffff",
+    borderRadius: "20px",
+    padding: "22px",
+    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+    border: "1px solid #e2e8f0",
+  },
+  kpiLabel: {
+    margin: 0,
+    fontSize: "13px",
+    color: "#64748b",
+    fontWeight: 700,
+  },
+  kpiValue: {
+    margin: "10px 0 0",
+    fontSize: "30px",
+    fontWeight: 800,
+    color: "#0f172a",
+  },
   bestCard: {
     background: "linear-gradient(135deg, #1d4ed8, #2563eb)",
     color: "#fff",
@@ -374,6 +453,7 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: "16px",
     boxShadow: "0 12px 28px rgba(29,78,216,0.25)",
   },
   label: {
@@ -394,6 +474,7 @@ const styles = {
     padding: "12px 18px",
     borderRadius: "999px",
     fontWeight: 800,
+    whiteSpace: "nowrap",
   },
   card: {
     background: "#fff",
@@ -480,6 +561,20 @@ const styles = {
     width: "100%",
     borderCollapse: "collapse",
     fontSize: "14px",
+    minWidth: "900px",
+  },
+  th: {
+    textAlign: "left",
+    padding: "12px",
+    borderBottom: "1px solid #e2e8f0",
+    color: "#475569",
+    fontSize: "13px",
+    whiteSpace: "nowrap",
+  },
+  td: {
+    padding: "12px",
+    borderBottom: "1px solid #e2e8f0",
+    whiteSpace: "nowrap",
   },
   smallBadge: {
     background: "#dbeafe",

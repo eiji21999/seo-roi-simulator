@@ -242,49 +242,56 @@ export default function App() {
           </div>
         </section>
 
-        <section style={styles.card}>
-            <h2 style={styles.cardTitle}>施策比較結果</h2>
+<section style={styles.card}>
+  <h2 style={styles.cardTitle}>施策比較結果</h2>
 
-           <div style={{ marginBottom: 40 }}>
-  <h3 style={styles.graphTitle}>ROI比較</h3>
+  {/* ROIグラフ */}
+  <div style={{ marginBottom: 40 }}>
+    <h3 style={styles.graphTitle}>ROI比較</h3>
 
-  <div style={{ width: "100%", height: 320 }}>
-    <ResponsiveContainer>
-      <BarChart data={results}>
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Bar dataKey="roi" />
-      </BarChart>
-    </ResponsiveContainer>
+    <div style={{ width: "100%", height: 320 }}>
+      <ResponsiveContainer>
+        <BarChart data={results}>
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="roi" fill="#1d4ed8" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   </div>
-</div>
 
-                       <div style={{ marginBottom: 40 }}>
-  <h3 style={styles.graphTitle}>CPA比較</h3>
-  <div style={{ width: "100%", height: 320 }}>
-                <ResponsiveContainer>
-                    <BarChart data={results}>
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => yen(value)} />
-                    <Bar dataKey="cpa" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
+  {/* CPAグラフ */}
+  <div style={{ marginBottom: 40 }}>
+    <h3 style={styles.graphTitle}>CPA比較</h3>
 
-                       <div style={{ marginBottom: 40 }}>
-  <h3 style={styles.graphTitle}>CV数比較</h3>
-  <div style={{ width: "100%", height: 320 }}>
-    <ResponsiveContainer>
-    <BarChart data={results}>
-      <XAxis dataKey="name" />
-      <YAxis />
-      <Tooltip />
-      <Bar dataKey="cv" />
-    </BarChart>
-  </ResponsiveContainer>
-</div>
+    <div style={{ width: "100%", height: 320 }}>
+      <ResponsiveContainer>
+        <BarChart data={results}>
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip formatter={(value) => yen(value)} />
+          <Bar dataKey="cpa" fill="#1d4ed8" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+
+  {/* CVグラフ */}
+  <div style={{ marginBottom: 40 }}>
+    <h3 style={styles.graphTitle}>CV数比較</h3>
+
+    <div style={{ width: "100%", height: 320 }}>
+      <ResponsiveContainer>
+        <BarChart data={results}>
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="cv" fill="#1d4ed8" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
 
           <div style={styles.tableScroll}>
             <table style={styles.table}>

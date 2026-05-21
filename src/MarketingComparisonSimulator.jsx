@@ -398,6 +398,11 @@ function Td({ children, negative = false, strong = false }) {
 }
 
 const styles = {
+    graphTitle: {
+      margin: "0 0 14px",
+      fontSize: 18,
+      fontWeight: 800,
+    },
   page: {
     minHeight: "100vh",
     background: "#f6f7fb",

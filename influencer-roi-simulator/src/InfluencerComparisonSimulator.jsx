@@ -928,6 +928,8 @@ helpText: {
   sectionTitle: {
     fontSize: "20px",
     margin: 0,
+      color: "#0f172a",
+  fontWeight: 800,
   },
   inputGrid: {
     display: "grid",

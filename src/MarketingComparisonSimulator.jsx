@@ -245,16 +245,20 @@ export default function App() {
         <section style={styles.card}>
             <h2 style={styles.cardTitle}>施策比較結果</h2>
 
-            <div style={{ width: "100%", height: 320, marginBottom: 30 }}>
-                <ResponsiveContainer>
-                 <BarChart data={results}>
-                     <XAxis dataKey="name" />
-                     <YAxis />
-                     <Tooltip />
-                     <Bar dataKey="roi" />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
+           <div style={{ marginBottom: 40 }}>
+  <h3 style={styles.graphTitle}>ROI比較</h3>
+
+  <div style={{ width: "100%", height: 320 }}>
+    <ResponsiveContainer>
+      <BarChart data={results}>
+        <XAxis dataKey="name" />
+        <YAxis />
+        <Tooltip />
+        <Bar dataKey="roi" />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</div>
             
             <div style={{ width: "100%", height: 320, marginBottom: 30 }}>
                 <ResponsiveContainer>

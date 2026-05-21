@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -47,6 +47,8 @@ export default function App() {
   const [measures, setMeasures] = useState(initialMeasures);
   const [roundNumbers, setRoundNumbers] = useState(true);
   const [totalBudget, setTotalBudget] = useState("1000000");
+  const [activeTab, setActiveTab] = useState("summary");
+  const [shareMessage, setShareMessage] = useState("");
 
   const toNumber = (value) => Number(String(value).replace(/,/g, "")) || 0;
 
@@ -69,6 +71,32 @@ export default function App() {
     if (parts.length <= 2) return cleaned;
     return parts[0] + "." + parts.slice(1).join("");
   };
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const encoded = params.get("data");
+      if (!encoded) return;
+
+      const parsed = JSON.parse(decodeURIComponent(atob(encoded)));
+      if (parsed.totalBudget) setTotalBudget(String(parsed.totalBudget));
+      if (typeof parsed.roundNumbers === "boolean") setRoundNumbers(parsed.roundNumbers);
+      if (Array.isArray(parsed.measures) && parsed.measures.length > 0) {
+        setMeasures(
+          parsed.measures.map((item, index) => ({
+            id: index + 1,
+            name: item.name || "施策",
+            sessions: String(item.sessions || "0"),
+            cvr: String(item.cvr || "0"),
+            revenuePerCv: String(item.revenuePerCv || "0"),
+            budgetShare: String(item.budgetShare || "0"),
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("URLデータの読み込みに失敗しました", error);
+    }
+  }, []);
 
   const updateMeasure = (id, key, value) => {
     setMeasures((prev) =>
@@ -135,35 +163,45 @@ export default function App() {
     });
   }, [measures, roundNumbers, totalBudget]);
 
-  const bestRoi = useMemo(() => {
-    return [...results].sort((a, b) => b.roi - a.roi)[0];
-  }, [results]);
-
-  const bestCv = useMemo(() => {
-    return [...results].sort((a, b) => b.cv - a.cv)[0];
-  }, [results]);
-
+  const bestRoi = useMemo(() => [...results].sort((a, b) => b.roi - a.roi)[0], [results]);
+  const bestCv = useMemo(() => [...results].sort((a, b) => b.cv - a.cv)[0], [results]);
   const bestCpa = useMemo(() => {
     return [...results]
       .filter((item) => item.cv > 0)
       .sort((a, b) => a.cpa - b.cpa)[0];
   }, [results]);
 
+  const worstRoi = useMemo(() => [...results].sort((a, b) => a.roi - b.roi)[0], [results]);
+
   const totalCost = results.reduce((sum, item) => sum + item.cost, 0);
   const totalRevenue = results.reduce((sum, item) => sum + item.revenue, 0);
   const totalCv = results.reduce((sum, item) => sum + item.cv, 0);
+  const totalProfit = totalRevenue - totalCost;
   const totalRoi = totalCost > 0 ? ((totalRevenue - totalCost) / totalCost) * 100 : 0;
   const totalBudgetShare = results.reduce((sum, item) => sum + item.budgetShare, 0);
 
-  const downloadPdf = () => {
-    window.print();
-  };
+  const optimizationSuggestion = useMemo(() => {
+    if (!bestRoi || !worstRoi) return "施策データを入力すると、予算配分の提案が表示されます。";
+    if (results.length < 2) return "複数施策を入力すると、予算配分の比較提案ができます。";
+    if (bestRoi.id === worstRoi.id) return "施策間の差がまだ小さいため、CVR・費用・1CVあたり売上を調整して比較してください。";
+    if (bestRoi.roi <= 0) return "現状ではROIがプラスの施策がないため、CVR改善・費用削減・単価改善を優先してください。";
 
-  const reset = () => {
-    setMeasures(initialMeasures);
-    setRoundNumbers(true);
-    setTotalBudget("1000000");
-  };
+    return `${bestRoi.name} はROIが最も高いため、${worstRoi.name} から5〜10%程度の予算を移して検証する価値があります。`;
+  }, [bestRoi, worstRoi, results]);
+
+  const optimizedAllocation = useMemo(() => {
+    if (!bestRoi || !worstRoi || results.length < 2 || bestRoi.id === worstRoi.id) return results;
+
+    return results.map((item) => {
+      if (item.id === bestRoi.id) {
+        return { ...item, recommendedShare: Math.min(100, item.budgetShare + 10) };
+      }
+      if (item.id === worstRoi.id) {
+        return { ...item, recommendedShare: Math.max(0, item.budgetShare - 10) };
+      }
+      return { ...item, recommendedShare: item.budgetShare };
+    });
+  }, [results, bestRoi, worstRoi]);
 
   const formatTooltip = (value, name) => {
     if (name === "roi") return [Number(value).toFixed(1) + "%", "ROI"];
@@ -171,6 +209,70 @@ export default function App() {
     if (name === "cv") return [roundNumbers ? Math.round(value) + "件" : comma(value) + "件", "CV数"];
     if (name === "cost") return [yen(value), "費用"];
     return [value, name];
+  };
+
+  const downloadPdf = () => window.print();
+
+  const reset = () => {
+    setMeasures(initialMeasures);
+    setRoundNumbers(true);
+    setTotalBudget("1000000");
+    setActiveTab("summary");
+    setShareMessage("");
+  };
+
+  const downloadCsv = () => {
+    const header = ["施策", "流入数", "CVR", "CV数", "予算配分", "費用", "CPA", "売上", "利益", "ROI", "ROAS"];
+    const rows = results.map((item) => [
+      item.name,
+      item.sessions,
+      item.cvr + "%",
+      roundNumbers ? Math.round(item.cv) : item.cv,
+      item.budgetShare + "%",
+      Math.round(item.cost),
+      Math.round(item.cpa),
+      Math.round(item.revenue),
+      Math.round(item.profit),
+      item.roi.toFixed(1) + "%",
+      item.roas.toFixed(1) + "%",
+    ]);
+
+    const csv = [header, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("
+");
+
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "marketing-roi-comparison.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const createShareUrl = async () => {
+    const payload = {
+      totalBudget,
+      roundNumbers,
+      measures: measures.map(({ name, sessions, cvr, revenuePerCv, budgetShare }) => ({
+        name,
+        sessions,
+        cvr,
+        revenuePerCv,
+        budgetShare,
+      })),
+    };
+
+    const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
+    const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareMessage("共有URLをコピーしました");
+    } catch {
+      setShareMessage(url);
+    }
   };
 
   return (
@@ -187,171 +289,235 @@ export default function App() {
           </div>
           <div style={styles.actionArea} className="no-print">
             <button onClick={downloadPdf} style={styles.primaryButton}>PDF出力</button>
+            <button onClick={downloadCsv} style={styles.button}>CSV出力</button>
+            <button onClick={createShareUrl} style={styles.button}>URL共有</button>
             <button onClick={reset} style={styles.button}>初期値に戻す</button>
           </div>
         </header>
 
-        <section style={styles.summaryGrid}>
-          <Summary title="合計CV数" value={roundNumbers ? Math.round(totalCv) + "件" : comma(totalCv) + "件"} />
-          <Summary title="合計費用" value={yen(totalCost)} />
-          <Summary title="合計売上" value={yen(totalRevenue)} />
-          <Summary title="合計ROI" value={totalRoi.toFixed(1) + "%"} negative={totalRoi < 0} />
-        </section>
+        {shareMessage && <p style={styles.shareMessage}>{shareMessage}</p>}
 
-        <section style={styles.insightGrid}>
-          <InsightCard
-            title="ROIが最も高い施策"
-            name={bestRoi?.name || "-"}
-            detail={bestRoi ? `ROI ${bestRoi.roi.toFixed(1)}% / 利益 ${yen(bestRoi.profit)}` : "-"}
-          />
-          <InsightCard
-            title="CV数が最も多い施策"
-            name={bestCv?.name || "-"}
-            detail={bestCv ? `${roundNumbers ? Math.round(bestCv.cv) : comma(bestCv.cv)}件 / CVR ${bestCv.cvr}%` : "-"}
-          />
-          <InsightCard
-            title="CPAが最も低い施策"
-            name={bestCpa?.name || "-"}
-            detail={bestCpa ? `CPA ${yen(bestCpa.cpa)} / 費用 ${yen(bestCpa.cost)}` : "CVがある施策なし"}
-          />
-        </section>
+        <nav style={styles.tabNav} className="no-print">
+          <TabButton active={activeTab === "summary"} onClick={() => setActiveTab("summary")}>概要</TabButton>
+          <TabButton active={activeTab === "input"} onClick={() => setActiveTab("input")}>入力</TabButton>
+          <TabButton active={activeTab === "charts"} onClick={() => setActiveTab("charts")}>グラフ</TabButton>
+          <TabButton active={activeTab === "table"} onClick={() => setActiveTab("table")}>比較表</TabButton>
+        </nav>
 
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <div>
-              <h2 style={styles.cardTitle}>施策別入力</h2>
-              <p style={styles.smallText}>総予算、流入数、CVR、予算配分、1CVあたり売上を入力してください。</p>
-              <div style={styles.budgetBox}>
-                <Field label="総予算" value={totalBudget} onChange={setTotalBudget} suffix="円" />
-                <p style={{ ...styles.budgetShareText, ...(totalBudgetShare !== 100 ? styles.warningText : {}) }}>
-                  予算配分合計：{comma(totalBudgetShare)}%{totalBudgetShare !== 100 ? "（100%になるように調整してください）" : ""}
-                </p>
-              </div>
-            </div>
-            <div style={styles.optionArea} className="no-print">
-              <label style={styles.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={roundNumbers}
-                  onChange={(e) => setRoundNumbers(e.target.checked)}
-                />
-                <span>CV数を四捨五入</span>
-              </label>
-              <button onClick={addMeasure} style={styles.button}>施策を追加</button>
-            </div>
-          </div>
+        {(activeTab === "summary" || activeTab === "input" || activeTab === "charts" || activeTab === "table") && (
+          <section style={styles.summaryGrid}>
+            <Summary title="合計CV数" value={roundNumbers ? Math.round(totalCv) + "件" : comma(totalCv) + "件"} />
+            <Summary title="合計費用" value={yen(totalCost)} />
+            <Summary title="合計売上" value={yen(totalRevenue)} />
+            <Summary title="合計利益" value={yen(totalProfit)} negative={totalProfit < 0} />
+            <Summary title="合計ROI" value={totalRoi.toFixed(1) + "%"} negative={totalRoi < 0} />
+          </section>
+        )}
 
-          <div style={styles.inputList}>
-            {measures.map((item) => (
-              <div key={item.id} style={styles.measureBox}>
-                <div style={styles.measureHeader}>
-                  <input
-                    value={item.name}
-                    onChange={(e) => updateMeasure(item.id, "name", e.target.value)}
-                    style={styles.measureNameInput}
-                  />
-                  {measures.length > 1 && (
-                    <button onClick={() => removeMeasure(item.id)} style={styles.deleteButton} className="no-print">
-                      削除
-                    </button>
-                  )}
-                </div>
+        {activeTab === "summary" && (
+          <>
+            <section style={styles.insightGrid}>
+              <InsightCard
+                title="ROIが最も高い施策"
+                name={bestRoi?.name || "-"}
+                detail={bestRoi ? `ROI ${bestRoi.roi.toFixed(1)}% / 利益 ${yen(bestRoi.profit)}` : "-"}
+              />
+              <InsightCard
+                title="CV数が最も多い施策"
+                name={bestCv?.name || "-"}
+                detail={bestCv ? `${roundNumbers ? Math.round(bestCv.cv) : comma(bestCv.cv)}件 / CVR ${bestCv.cvr}%` : "-"}
+              />
+              <InsightCard
+                title="CPAが最も低い施策"
+                name={bestCpa?.name || "-"}
+                detail={bestCpa ? `CPA ${yen(bestCpa.cpa)} / 費用 ${yen(bestCpa.cost)}` : "CVがある施策なし"}
+              />
+            </section>
 
-                <div style={styles.fieldGrid}>
-                  <Field label="流入数" value={item.sessions} onChange={(value) => updateMeasure(item.id, "sessions", value)} suffix="PV" />
-                  <Field label="CVR" value={item.cvr} onChange={(value) => updateMeasure(item.id, "cvr", value)} suffix="%" />
-                  <Field label="予算配分" value={item.budgetShare} onChange={(value) => updateMeasure(item.id, "budgetShare", value)} suffix="%" />
-                  <div style={styles.sliderField}>
-                    <span style={styles.label}>予算配分スライダー</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={item.budgetShare || "0"}
-                      onChange={(e) => updateMeasure(item.id, "budgetShare", e.target.value)}
-                      style={styles.range}
-                    />
-                  </div>
-                  <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section style={styles.card}>
-          <h2 style={styles.cardTitle}>施策比較結果</h2>
-
-          <ChartBlock title="ROI比較" data={results} dataKey="roi" tooltipFormatter={formatTooltip} labelFormatter={(v) => Number(v).toFixed(0) + "%"} />
-          <ChartBlock title="CPA比較" data={results} dataKey="cpa" tooltipFormatter={formatTooltip} labelFormatter={(v) => yen(v)} />
-          <ChartBlock title="CV数比較" data={results} dataKey="cv" tooltipFormatter={formatTooltip} labelFormatter={(v) => (roundNumbers ? Math.round(v) + "件" : comma(v) + "件")} />
-
-          <div style={styles.chartBlock}>
-            <h3 style={styles.graphTitle}>施策別費用割合</h3>
-            <div style={styles.pieBox}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={results}
-                    dataKey="cost"
-                    nameKey="name"
-                    outerRadius={130}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {results.map((entry, index) => (
-                      <Cell key={`cell-${entry.id}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => yen(value)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div style={styles.tableScroll}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <Th>施策</Th>
-                  <Th>流入数</Th>
-                  <Th>CVR</Th>
-                  <Th>CV数</Th>
-                  <Th>予算配分</Th>
-                  <Th>費用</Th>
-                  <Th>CPA</Th>
-                  <Th>売上</Th>
-                  <Th>利益</Th>
-                  <Th>ROI</Th>
-                  <Th>ROAS</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {results
-                  .slice()
-                  .sort((a, b) => b.roi - a.roi)
-                  .map((item, index) => (
-                    <tr key={item.id} style={index === 0 ? styles.bestRow : undefined}>
-                      <Td strong>{item.name}</Td>
-                      <Td>{comma(item.sessions)}</Td>
-                      <Td>{item.cvr}%</Td>
-                      <Td>{roundNumbers ? Math.round(item.cv) : comma(item.cv)}</Td>
-                      <Td>{comma(item.budgetShare)}%</Td>
-                      <Td>{yen(item.cost)}</Td>
-                      <Td>{yen(item.cpa)}</Td>
-                      <Td>{yen(item.revenue)}</Td>
-                      <Td negative={item.profit < 0}>{yen(item.profit)}</Td>
-                      <Td negative={item.roi < 0}>{item.roi.toFixed(1)}%</Td>
-                      <Td>{item.roas.toFixed(1)}%</Td>
+            <section style={styles.card}>
+              <h2 style={styles.cardTitle}>自動最適化提案</h2>
+              <p style={styles.recommendation}>{optimizationSuggestion}</p>
+              <div style={styles.tableScroll}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <Th>施策</Th>
+                      <Th>現在の配分</Th>
+                      <Th>推奨配分</Th>
+                      <Th>ROI</Th>
                     </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-          <p style={styles.note}>※ 表はROIが高い順に並びます。1行目が費用対効果の最も高い施策です。</p>
-        </section>
+                  </thead>
+                  <tbody>
+                    {optimizedAllocation.map((item) => (
+                      <tr key={item.id}>
+                        <Td strong>{item.name}</Td>
+                        <Td>{comma(item.budgetShare)}%</Td>
+                        <Td>{comma(item.recommendedShare ?? item.budgetShare)}%</Td>
+                        <Td negative={item.roi < 0}>{item.roi.toFixed(1)}%</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === "input" && (
+          <InputSection
+            measures={measures}
+            totalBudget={totalBudget}
+            setTotalBudget={setTotalBudget}
+            totalBudgetShare={totalBudgetShare}
+            updateMeasure={updateMeasure}
+            removeMeasure={removeMeasure}
+            addMeasure={addMeasure}
+            roundNumbers={roundNumbers}
+            setRoundNumbers={setRoundNumbers}
+            comma={comma}
+          />
+        )}
+
+        {activeTab === "charts" && (
+          <ChartsSection
+            results={results}
+            formatTooltip={formatTooltip}
+            roundNumbers={roundNumbers}
+            comma={comma}
+            yen={yen}
+          />
+        )}
+
+        {activeTab === "table" && (
+          <TableSection
+            results={results}
+            roundNumbers={roundNumbers}
+            comma={comma}
+            yen={yen}
+          />
+        )}
       </div>
     </main>
+  );
+}
+
+function InputSection({ measures, totalBudget, setTotalBudget, totalBudgetShare, updateMeasure, removeMeasure, addMeasure, roundNumbers, setRoundNumbers, comma }) {
+  return (
+    <section style={styles.card}>
+      <div style={styles.cardHeader}>
+        <div>
+          <h2 style={styles.cardTitle}>施策別入力</h2>
+          <p style={styles.smallText}>総予算、流入数、CVR、予算配分、1CVあたり売上を入力してください。</p>
+          <div style={styles.budgetBox}>
+            <Field label="総予算" value={totalBudget} onChange={setTotalBudget} suffix="円" />
+            <p style={{ ...styles.budgetShareText, ...(totalBudgetShare !== 100 ? styles.warningText : {}) }}>
+              予算配分合計：{comma(totalBudgetShare)}%{totalBudgetShare !== 100 ? "（100%になるように調整してください）" : ""}
+            </p>
+          </div>
+        </div>
+        <div style={styles.optionArea} className="no-print">
+          <label style={styles.checkboxRow}>
+            <input type="checkbox" checked={roundNumbers} onChange={(e) => setRoundNumbers(e.target.checked)} />
+            <span>CV数を四捨五入</span>
+          </label>
+          <button onClick={addMeasure} style={styles.button}>施策を追加</button>
+        </div>
+      </div>
+
+      <div style={styles.inputList}>
+        {measures.map((item) => (
+          <div key={item.id} style={styles.measureBox} className="hover-card">
+            <div style={styles.measureHeader}>
+              <input value={item.name} onChange={(e) => updateMeasure(item.id, "name", e.target.value)} style={styles.measureNameInput} />
+              {measures.length > 1 && (
+                <button onClick={() => removeMeasure(item.id)} style={styles.deleteButton} className="no-print">削除</button>
+              )}
+            </div>
+            <div style={styles.fieldGrid}>
+              <Field label="流入数" value={item.sessions} onChange={(value) => updateMeasure(item.id, "sessions", value)} suffix="PV" />
+              <Field label="CVR" value={item.cvr} onChange={(value) => updateMeasure(item.id, "cvr", value)} suffix="%" />
+              <Field label="予算配分" value={item.budgetShare} onChange={(value) => updateMeasure(item.id, "budgetShare", value)} suffix="%" />
+              <div style={styles.sliderField}>
+                <span style={styles.label}>予算配分スライダー</span>
+                <input type="range" min="0" max="100" value={item.budgetShare || "0"} onChange={(e) => updateMeasure(item.id, "budgetShare", e.target.value)} style={styles.range} />
+              </div>
+              <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ChartsSection({ results, formatTooltip, roundNumbers, comma, yen }) {
+  return (
+    <section style={styles.card}>
+      <h2 style={styles.cardTitle}>グラフ分析</h2>
+      <ChartBlock title="ROI比較" data={results} dataKey="roi" tooltipFormatter={formatTooltip} labelFormatter={(v) => Number(v).toFixed(0) + "%"} />
+      <ChartBlock title="CPA比較" data={results} dataKey="cpa" tooltipFormatter={formatTooltip} labelFormatter={(v) => yen(v)} />
+      <ChartBlock title="CV数比較" data={results} dataKey="cv" tooltipFormatter={formatTooltip} labelFormatter={(v) => (roundNumbers ? Math.round(v) + "件" : comma(v) + "件")} />
+
+      <div style={styles.chartBlock}>
+        <h3 style={styles.graphTitle}>施策別費用割合</h3>
+        <div style={styles.pieBox}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={results} dataKey="cost" nameKey="name" outerRadius={130} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                {results.map((entry, index) => <Cell key={`cell-${entry.id}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+              </Pie>
+              <Tooltip formatter={(value) => yen(value)} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TableSection({ results, roundNumbers, comma, yen }) {
+  return (
+    <section style={styles.card}>
+      <h2 style={styles.cardTitle}>施策比較結果</h2>
+      <div style={styles.tableScroll}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <Th>施策</Th>
+              <Th>流入数</Th>
+              <Th>CVR</Th>
+              <Th>CV数</Th>
+              <Th>予算配分</Th>
+              <Th>費用</Th>
+              <Th>CPA</Th>
+              <Th>売上</Th>
+              <Th>利益</Th>
+              <Th>ROI</Th>
+              <Th>ROAS</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.slice().sort((a, b) => b.roi - a.roi).map((item, index) => (
+              <tr key={item.id} style={index === 0 ? styles.bestRow : undefined}>
+                <Td strong>{item.name}</Td>
+                <Td>{comma(item.sessions)}</Td>
+                <Td>{item.cvr}%</Td>
+                <Td>{roundNumbers ? Math.round(item.cv) : comma(item.cv)}</Td>
+                <Td>{comma(item.budgetShare)}%</Td>
+                <Td>{yen(item.cost)}</Td>
+                <Td>{yen(item.cpa)}</Td>
+                <Td>{yen(item.revenue)}</Td>
+                <Td negative={item.profit < 0}>{yen(item.profit)}</Td>
+                <Td negative={item.roi < 0}>{item.roi.toFixed(1)}%</Td>
+                <Td>{item.roas.toFixed(1)}%</Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p style={styles.note}>※ 表はROIが高い順に並びます。1行目が費用対効果の最も高い施策です。</p>
+    </section>
   );
 }
 
@@ -365,7 +531,7 @@ function ChartBlock({ title, data, dataKey, tooltipFormatter, labelFormatter }) 
             <XAxis dataKey="name" />
             <YAxis />
             <Tooltip formatter={tooltipFormatter} />
-            <Bar dataKey={dataKey} fill={BAR_COLOR} radius={[8, 8, 0, 0]}>
+            <Bar dataKey={dataKey} fill={BAR_COLOR} radius={[8, 8, 0, 0]} isAnimationActive>
               <LabelList dataKey={dataKey} position="top" formatter={labelFormatter} style={{ fontSize: 12, fontWeight: 700 }} />
             </Bar>
           </BarChart>
@@ -396,24 +562,20 @@ function Field({ label, value, onChange, suffix = "" }) {
     <label style={styles.field}>
       <span style={styles.label}>{label}</span>
       <div style={styles.inputRow}>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={value}
-          onChange={(e) => onChange(sanitizeNumber(e.target.value))}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          style={styles.input}
-        />
+        <input type="text" inputMode="decimal" value={value} onChange={(e) => onChange(sanitizeNumber(e.target.value))} onFocus={handleFocus} onBlur={handleBlur} style={styles.input} />
         <span style={styles.suffix}>{suffix}</span>
       </div>
     </label>
   );
 }
 
+function TabButton({ active, onClick, children }) {
+  return <button onClick={onClick} style={{ ...styles.tabButton, ...(active ? styles.tabButtonActive : {}) }}>{children}</button>;
+}
+
 function Summary({ title, value, negative = false }) {
   return (
-    <div style={styles.summaryCard}>
+    <div style={styles.summaryCard} className="hover-card">
       <p style={styles.summaryTitle}>{title}</p>
       <p style={{ ...styles.summaryValue, ...(negative ? styles.negativeText : {}) }}>{value}</p>
     </div>
@@ -422,7 +584,7 @@ function Summary({ title, value, negative = false }) {
 
 function InsightCard({ title, name, detail }) {
   return (
-    <div style={styles.insightCard}>
+    <div style={styles.insightCard} className="hover-card-dark">
       <p style={styles.summaryTitle}>{title}</p>
       <p style={styles.insightName}>{name}</p>
       <p style={styles.insightDetail}>{detail}</p>
@@ -435,11 +597,7 @@ function Th({ children }) {
 }
 
 function Td({ children, negative = false, strong = false }) {
-  return (
-    <td style={{ ...styles.td, ...(negative ? styles.negativeText : {}), fontWeight: strong ? 800 : undefined }}>
-      {children}
-    </td>
-  );
+  return <td style={{ ...styles.td, ...(negative ? styles.negativeText : {}), fontWeight: strong ? 800 : undefined }}>{children}</td>;
 }
 
 const styles = {
@@ -451,7 +609,7 @@ const styles = {
     padding: "32px 16px",
   },
   container: { maxWidth: "1200px", margin: "0 auto" },
-  header: { display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 24 },
+  header: { display: "flex", justifyContent: "space-between", gap: 20, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 18 },
   sub: { margin: 0, color: "#64748b", fontWeight: 700 },
   title: { margin: "8px 0", fontSize: "clamp(30px, 5vw, 42px)", lineHeight: 1.2 },
   text: { margin: 0, color: "#64748b", lineHeight: 1.7, maxWidth: 760 },
@@ -459,12 +617,16 @@ const styles = {
   button: { border: "1px solid #cbd5e1", background: "white", borderRadius: 12, padding: "12px 18px", cursor: "pointer", fontWeight: 700 },
   primaryButton: { border: "1px solid #0f172a", background: "#0f172a", color: "white", borderRadius: 12, padding: "12px 18px", cursor: "pointer", fontWeight: 700 },
   deleteButton: { border: "1px solid #fecaca", background: "#fff1f2", color: "#9f1239", borderRadius: 10, padding: "8px 12px", cursor: "pointer", fontWeight: 700 },
+  shareMessage: { margin: "0 0 16px", color: "#1d4ed8", fontWeight: 800 },
+  tabNav: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 },
+  tabButton: { border: "1px solid #cbd5e1", background: "white", color: "#334155", borderRadius: 999, padding: "10px 16px", cursor: "pointer", fontWeight: 800 },
+  tabButtonActive: { background: BAR_COLOR, borderColor: BAR_COLOR, color: "white" },
   summaryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 18 },
-  summaryCard: { background: "white", borderRadius: 20, padding: 22, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)" },
+  summaryCard: { background: "white", borderRadius: 20, padding: 22, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)", transition: "transform .2s ease, box-shadow .2s ease" },
   summaryTitle: { margin: 0, color: "#64748b", fontWeight: 700, fontSize: 14 },
   summaryValue: { margin: "10px 0 0", fontSize: "clamp(22px, 5vw, 28px)", fontWeight: 800 },
   insightGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 24 },
-  insightCard: { background: "#0f172a", color: "white", borderRadius: 20, padding: 22, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.1)" },
+  insightCard: { background: "#0f172a", color: "white", borderRadius: 20, padding: 22, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.1)", transition: "transform .2s ease, box-shadow .2s ease" },
   insightName: { margin: "10px 0 6px", fontSize: 24, fontWeight: 900 },
   insightDetail: { margin: 0, color: "#cbd5e1", lineHeight: 1.6 },
   negativeText: { color: "#9f1239", fontWeight: 800 },
@@ -473,12 +635,13 @@ const styles = {
   cardHeader: { display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 18 },
   cardTitle: { margin: "0 0 8px", fontSize: 22 },
   smallText: { margin: 0, color: "#64748b", lineHeight: 1.6 },
+  recommendation: { margin: "0 0 18px", lineHeight: 1.9, fontSize: 17, fontWeight: 800, color: "#1d4ed8" },
   budgetBox: { marginTop: 16, marginBottom: 20, maxWidth: 360 },
   budgetShareText: { margin: "8px 0 0", fontSize: 13, color: "#64748b" },
   optionArea: { display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" },
   checkboxRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#475569", cursor: "pointer" },
   inputList: { display: "grid", gap: 16 },
-  measureBox: { border: "1px solid #e2e8f0", borderRadius: 18, padding: 18, background: "#fbfdff" },
+  measureBox: { border: "1px solid #e2e8f0", borderRadius: 18, padding: 18, background: "#fbfdff", transition: "transform .2s ease, box-shadow .2s ease" },
   measureHeader: { display: "flex", gap: 12, justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   measureNameInput: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "12px 12px", fontSize: 18, fontWeight: 800, boxSizing: "border-box" },
   fieldGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 },
@@ -502,40 +665,24 @@ const styles = {
 };
 
 const printAndResponsiveCss = `
-  * {
-    box-sizing: border-box;
+  * { box-sizing: border-box; }
+
+  .hover-card:hover,
+  .hover-card-dark:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14) !important;
   }
 
   @media (max-width: 768px) {
-    main {
-      padding: 20px 12px !important;
-    }
-
-    button {
-      width: 100%;
-    }
+    main { padding: 20px 12px !important; }
+    button { width: 100%; }
   }
 
   @media print {
-    body {
-      background: #ffffff !important;
-    }
-
-    main {
-      background: #ffffff !important;
-      padding: 0 !important;
-    }
-
-    .no-print {
-      display: none !important;
-    }
-
-    div {
-      box-shadow: none !important;
-    }
-
-    table {
-      font-size: 10px !important;
-    }
+    body { background: #ffffff !important; }
+    main { background: #ffffff !important; padding: 0 !important; }
+    .no-print { display: none !important; }
+    div { box-shadow: none !important; }
+    table { font-size: 10px !important; }
   }
 `;

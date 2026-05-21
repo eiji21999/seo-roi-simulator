@@ -720,6 +720,37 @@ export default function InfluencerComparisonSimulator() {
           ))}
         </ul>
       </div>
+      <div style={styles.card}>
+  <h2 style={styles.sectionTitle}>判定基準ヘルプ</h2>
+
+  <div style={styles.helpBox}>
+    <h3 style={styles.helpTitle}>SNS適性スコア</h3>
+    <p style={styles.helpText}>
+      SNSごとに重要な指標を点数化したものです。Instagramは保存率やプロフィール遷移率、TikTokは視聴維持率やシェア率、YouTubeは平均視聴時間や概要欄CTR、XはリンクCTRやリポスト率を重視しています。
+    </p>
+  </div>
+
+  <div style={styles.helpBox}>
+    <h3 style={styles.helpTitle}>Rank A</h3>
+    <p style={styles.helpText}>
+      ROIが100%以上、かつSNS適性スコアが75以上の候補です。費用対効果と媒体相性の両方が高い候補として判定されます。
+    </p>
+  </div>
+
+  <div style={styles.helpBox}>
+    <h3 style={styles.helpTitle}>Rank B</h3>
+    <p style={styles.helpText}>
+      ROIが0%以上、かつSNS適性スコアが50以上の候補です。最低限の利益が見込め、媒体相性も一定以上ある候補です。
+    </p>
+  </div>
+
+  <div style={styles.helpBox}>
+    <h3 style={styles.helpTitle}>Rank C</h3>
+    <p style={styles.helpText}>
+      ROIまたはSNS適性スコアが基準を下回る候補です。費用交渉、投稿内容の見直し、または見送りを検討する候補です。
+    </p>
+  </div>
+</div>
     </div>
   );
 }
@@ -761,6 +792,28 @@ function KpiCard({ title, value, danger }) {
 }
 
 const styles = {
+helpBox: {
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "16px",
+  padding: "16px",
+  marginTop: "14px",
+},
+
+helpTitle: {
+  margin: "0 0 8px",
+  fontSize: "16px",
+  fontWeight: 800,
+  color: "#1d4ed8",
+},
+
+helpText: {
+  margin: 0,
+  color: "#334155",
+  lineHeight: 1.8,
+  fontSize: "14px",
+},
+
   page: {
     minHeight: "100vh",
     background: "#f3f6fb",

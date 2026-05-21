@@ -451,6 +451,9 @@ function Td({ children, negative = false, strong = false }) {
 }
 
 const styles = {
+    range: {
+     width: "100%",
+    },
   page: {
     minHeight: "100vh",
     background: "#f6f7fb",

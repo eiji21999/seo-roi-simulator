@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from "react";
-
 import {
   BarChart,
   Bar,
@@ -7,6 +6,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  LabelList,
 } from "recharts";
 
 const initialMeasures = [
@@ -35,6 +35,8 @@ const initialMeasures = [
     revenuePerCv: "300000",
   },
 ];
+
+const BAR_COLOR = "#1d4ed8";
 
 export default function App() {
   const [measures, setMeasures] = useState(initialMeasures);
@@ -140,7 +142,6 @@ export default function App() {
 
   const totalCost = results.reduce((sum, item) => sum + item.cost, 0);
   const totalRevenue = results.reduce((sum, item) => sum + item.revenue, 0);
-  const totalProfit = totalRevenue - totalCost;
   const totalCv = results.reduce((sum, item) => sum + item.cv, 0);
   const totalRoi = totalCost > 0 ? ((totalRevenue - totalCost) / totalCost) * 100 : 0;
 
@@ -151,6 +152,13 @@ export default function App() {
   const reset = () => {
     setMeasures(initialMeasures);
     setRoundNumbers(true);
+  };
+
+  const formatTooltip = (value, name) => {
+    if (name === "roi") return [Number(value).toFixed(1) + "%", "ROI"];
+    if (name === "cpa") return [yen(value), "CPA"];
+    if (name === "cv") return [roundNumbers ? Math.round(value) + "件" : comma(value) + "件", "CV数"];
+    return [value, name];
   };
 
   return (
@@ -242,56 +250,12 @@ export default function App() {
           </div>
         </section>
 
-<section style={styles.card}>
-  <h2 style={styles.cardTitle}>施策比較結果</h2>
+        <section style={styles.card}>
+          <h2 style={styles.cardTitle}>施策比較結果</h2>
 
-  {/* ROIグラフ */}
-  <div style={{ marginBottom: 40 }}>
-    <h3 style={styles.graphTitle}>ROI比較</h3>
-
-    <div style={{ width: "100%", height: 320 }}>
-      <ResponsiveContainer>
-        <BarChart data={results}>
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Bar dataKey="roi" fill="#1d4ed8" />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-
-  {/* CPAグラフ */}
-  <div style={{ marginBottom: 40 }}>
-    <h3 style={styles.graphTitle}>CPA比較</h3>
-
-    <div style={{ width: "100%", height: 320 }}>
-      <ResponsiveContainer>
-        <BarChart data={results}>
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip formatter={(value) => yen(value)} />
-          <Bar dataKey="cpa" fill="#1d4ed8" />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-
-  {/* CVグラフ */}
-  <div style={{ marginBottom: 40 }}>
-    <h3 style={styles.graphTitle}>CV数比較</h3>
-
-    <div style={{ width: "100%", height: 320 }}>
-      <ResponsiveContainer>
-        <BarChart data={results}>
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Bar dataKey="cv" fill="#1d4ed8" />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
+          <ChartBlock title="ROI比較" data={results} dataKey="roi" tooltipFormatter={formatTooltip} labelFormatter={(v) => Number(v).toFixed(0) + "%"} />
+          <ChartBlock title="CPA比較" data={results} dataKey="cpa" tooltipFormatter={formatTooltip} labelFormatter={(v) => yen(v)} />
+          <ChartBlock title="CV数比較" data={results} dataKey="cv" tooltipFormatter={formatTooltip} labelFormatter={(v) => roundNumbers ? Math.round(v) + "件" : comma(v) + "件"} />
 
           <div style={styles.tableScroll}>
             <table style={styles.table}>
@@ -334,6 +298,26 @@ export default function App() {
         </section>
       </div>
     </main>
+  );
+}
+
+function ChartBlock({ title, data, dataKey, tooltipFormatter, labelFormatter }) {
+  return (
+    <div style={styles.chartBlock}>
+      <h3 style={styles.graphTitle}>{title}</h3>
+      <div style={styles.chartBox}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 28, right: 20, left: 10, bottom: 8 }}>
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip formatter={tooltipFormatter} />
+            <Bar dataKey={dataKey} fill={BAR_COLOR} radius={[8, 8, 0, 0]}>
+              <LabelList dataKey={dataKey} position="top" formatter={labelFormatter} style={{ fontSize: 12, fontWeight: 700 }} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 
@@ -405,11 +389,6 @@ function Td({ children, negative = false, strong = false }) {
 }
 
 const styles = {
-    graphTitle: {
-      margin: "0 0 14px",
-      fontSize: 18,
-      fontWeight: 800,
-    },
   page: {
     minHeight: "100vh",
     background: "#f6f7fb",
@@ -451,6 +430,9 @@ const styles = {
   inputRow: { display: "flex", gap: 8, alignItems: "center" },
   input: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "12px 12px", fontSize: 16, boxSizing: "border-box" },
   suffix: { width: 36, color: "#64748b", fontSize: 14 },
+  chartBlock: { marginBottom: 42 },
+  graphTitle: { margin: "0 0 14px", fontSize: 18, fontWeight: 800 },
+  chartBox: { width: "100%", height: 340 },
   tableScroll: { width: "100%", overflowX: "auto" },
   table: { width: "100%", minWidth: 980, borderCollapse: "collapse", fontSize: 14 },
   th: { textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0", padding: 12, whiteSpace: "nowrap" },

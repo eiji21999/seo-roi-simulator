@@ -50,6 +50,7 @@ export default function InfluencerComparisonSimulator() {
   const [influencers, setInfluencers] = useState(initialInfluencers);
 
   const calculated = useMemo(() => {
+    const summary = useMemo(() => {
     return influencers.map((item) => {
       const conversions = item.views * (item.cvr / 100);
       const sales = conversions * item.averageOrderValue;

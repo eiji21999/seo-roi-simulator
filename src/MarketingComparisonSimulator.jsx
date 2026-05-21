@@ -1,5 +1,14 @@
 import React, { useMemo, useState } from "react";
 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
 const initialMeasures = [
   {
     id: 1,

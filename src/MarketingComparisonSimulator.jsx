@@ -15,20 +15,18 @@ import {
 
 const initialMeasures = [
   {
-  id: 1,
-  name: "SEO",
-  sessions: "5000",
-  cvr: "1.2",
-  cost: "200000",
-  revenuePerCv: "300000",
-  budgetShare: "30",
+    id: 1,
+    name: "SEO",
+    sessions: "5000",
+    cvr: "1.2",
+    revenuePerCv: "300000",
+    budgetShare: "30",
   },
   {
     id: 2,
     name: "Google広告",
     sessions: "3000",
     cvr: "2.5",
-    cost: "500000",
     revenuePerCv: "300000",
     budgetShare: "50",
   },
@@ -37,17 +35,18 @@ const initialMeasures = [
     name: "SNS広告",
     sessions: "4000",
     cvr: "0.8",
-    cost: "300000",
     revenuePerCv: "300000",
     budgetShare: "20",
   },
 ];
 
 const BAR_COLOR = "#1d4ed8";
+const PIE_COLORS = ["#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe"];
 
 export default function App() {
   const [measures, setMeasures] = useState(initialMeasures);
   const [roundNumbers, setRoundNumbers] = useState(true);
+  const [totalBudget, setTotalBudget] = useState("1000000");
 
   const toNumber = (value) => Number(String(value).replace(/,/g, "")) || 0;
 
@@ -92,10 +91,9 @@ export default function App() {
         id: nextId,
         name: "新規施策",
         sessions: "0",
-        budgetShare: "0",
         cvr: "0",
-        cost: "0",
         revenuePerCv: "0",
+        budgetShare: "0",
       },
     ]);
   };
@@ -108,8 +106,10 @@ export default function App() {
     return measures.map((item) => {
       const sessions = toNumber(item.sessions);
       const cvr = toNumber(item.cvr);
-      const cost = toNumber(item.cost);
       const revenuePerCv = toNumber(item.revenuePerCv);
+      const budgetShare = toNumber(item.budgetShare);
+      const cost = toNumber(totalBudget) * (budgetShare / 100);
+
       const rawCv = sessions * (cvr / 100);
       const cv = roundNumbers ? Math.round(rawCv) : Number(rawCv.toFixed(2));
       const revenue = cv * revenuePerCv;
@@ -122,8 +122,9 @@ export default function App() {
         ...item,
         sessions,
         cvr,
-        cost,
         revenuePerCv,
+        budgetShare,
+        cost,
         cv,
         revenue,
         profit,
@@ -132,7 +133,7 @@ export default function App() {
         roas,
       };
     });
-  }, [measures, roundNumbers]);
+  }, [measures, roundNumbers, totalBudget]);
 
   const bestRoi = useMemo(() => {
     return [...results].sort((a, b) => b.roi - a.roi)[0];
@@ -152,6 +153,7 @@ export default function App() {
   const totalRevenue = results.reduce((sum, item) => sum + item.revenue, 0);
   const totalCv = results.reduce((sum, item) => sum + item.cv, 0);
   const totalRoi = totalCost > 0 ? ((totalRevenue - totalCost) / totalCost) * 100 : 0;
+  const totalBudgetShare = results.reduce((sum, item) => sum + item.budgetShare, 0);
 
   const downloadPdf = () => {
     window.print();
@@ -160,12 +162,14 @@ export default function App() {
   const reset = () => {
     setMeasures(initialMeasures);
     setRoundNumbers(true);
+    setTotalBudget("1000000");
   };
 
   const formatTooltip = (value, name) => {
     if (name === "roi") return [Number(value).toFixed(1) + "%", "ROI"];
     if (name === "cpa") return [yen(value), "CPA"];
     if (name === "cv") return [roundNumbers ? Math.round(value) + "件" : comma(value) + "件", "CV数"];
+    if (name === "cost") return [yen(value), "費用"];
     return [value, name];
   };
 
@@ -216,7 +220,13 @@ export default function App() {
           <div style={styles.cardHeader}>
             <div>
               <h2 style={styles.cardTitle}>施策別入力</h2>
-              <p style={styles.smallText}>流入数・CVR・費用・1CVあたり売上を入力してください。</p>
+              <p style={styles.smallText}>総予算、流入数、CVR、予算配分、1CVあたり売上を入力してください。</p>
+              <div style={styles.budgetBox}>
+                <Field label="総予算" value={totalBudget} onChange={setTotalBudget} suffix="円" />
+                <p style={{ ...styles.budgetShareText, ...(totalBudgetShare !== 100 ? styles.warningText : {}) }}>
+                  予算配分合計：{comma(totalBudgetShare)}%{totalBudgetShare !== 100 ? "（100%になるように調整してください）" : ""}
+                </p>
+              </div>
             </div>
             <div style={styles.optionArea} className="no-print">
               <label style={styles.checkboxRow}>
@@ -248,20 +258,21 @@ export default function App() {
                 </div>
 
                 <div style={styles.fieldGrid}>
-                    <Field label="流入数" value={item.sessions} onChange={(value) => updateMeasure(item.id, "sessions", value)} suffix="PV" />
-                    <Field label="CVR" value={item.cvr} onChange={(value) => updateMeasure(item.id, "cvr", value)} suffix="%" />
-                    <Field label="予算配分" value={item.budgetShare}  onChange={(value) =>  updateMeasure(item.id, "budgetShare", value) } suffix="%" />                  
+                  <Field label="流入数" value={item.sessions} onChange={(value) => updateMeasure(item.id, "sessions", value)} suffix="PV" />
+                  <Field label="CVR" value={item.cvr} onChange={(value) => updateMeasure(item.id, "cvr", value)} suffix="%" />
+                  <Field label="予算配分" value={item.budgetShare} onChange={(value) => updateMeasure(item.id, "budgetShare", value)} suffix="%" />
+                  <div style={styles.sliderField}>
+                    <span style={styles.label}>予算配分スライダー</span>
                     <input
-  type="range"
-  min="0"
-  max="100"
-  value={item.budgetShare}
-  onChange={(e) =>
-    updateMeasure(item.id, "budgetShare", e.target.value)
-  }
-  style={styles.range}
-/>
-                    <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={item.budgetShare || "0"}
+                      onChange={(e) => updateMeasure(item.id, "budgetShare", e.target.value)}
+                      style={styles.range}
+                    />
+                  </div>
+                  <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
                 </div>
               </div>
             ))}
@@ -273,49 +284,30 @@ export default function App() {
 
           <ChartBlock title="ROI比較" data={results} dataKey="roi" tooltipFormatter={formatTooltip} labelFormatter={(v) => Number(v).toFixed(0) + "%"} />
           <ChartBlock title="CPA比較" data={results} dataKey="cpa" tooltipFormatter={formatTooltip} labelFormatter={(v) => yen(v)} />
-          <ChartBlock title="CV数比較" data={results} dataKey="cv" tooltipFormatter={formatTooltip} labelFormatter={(v) => roundNumbers ? Math.round(v) + "件" : comma(v) + "件"} />
+          <ChartBlock title="CV数比較" data={results} dataKey="cv" tooltipFormatter={formatTooltip} labelFormatter={(v) => (roundNumbers ? Math.round(v) + "件" : comma(v) + "件")} />
 
-<div style={styles.chartBlock}>
-  <h3 style={styles.graphTitle}>施策別費用割合</h3>
-
-  <div style={{ width: "100%", height: 380 }}>
-    <ResponsiveContainer>
-      <PieChart>
-        <Pie
-          data={results}
-          dataKey="cost"
-          nameKey="name"
-          outerRadius={130}
-          label={({ name, percent }) =>
-            `${name} ${(percent * 100).toFixed(0)}%`
-          }
-        >
-          {results.map((entry, index) => {
-            const colors = [
-              "#1d4ed8",
-              "#2563eb",
-              "#3b82f6",
-              "#60a5fa",
-              "#93c5fd",
-            ];
-
-            return (
-              <Cell
-                key={`cell-${index}`}
-                fill={colors[index % colors.length]}
-              />
-            );
-          })}
-        </Pie>
-
-        <Tooltip formatter={(value) => yen(value)} />
-
-        <Legend />
-      </PieChart>
-    </ResponsiveContainer>
-  </div>
-</div>
-
+          <div style={styles.chartBlock}>
+            <h3 style={styles.graphTitle}>施策別費用割合</h3>
+            <div style={styles.pieBox}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={results}
+                    dataKey="cost"
+                    nameKey="name"
+                    outerRadius={130}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {results.map((entry, index) => (
+                      <Cell key={`cell-${entry.id}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => yen(value)} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
           <div style={styles.tableScroll}>
             <table style={styles.table}>
@@ -344,7 +336,7 @@ export default function App() {
                       <Td>{comma(item.sessions)}</Td>
                       <Td>{item.cvr}%</Td>
                       <Td>{roundNumbers ? Math.round(item.cv) : comma(item.cv)}</Td>
-                      <Td>{item.budgetShare}%</Td>
+                      <Td>{comma(item.budgetShare)}%</Td>
                       <Td>{yen(item.cost)}</Td>
                       <Td>{yen(item.cpa)}</Td>
                       <Td>{yen(item.revenue)}</Td>
@@ -451,9 +443,6 @@ function Td({ children, negative = false, strong = false }) {
 }
 
 const styles = {
-    range: {
-     width: "100%",
-    },
   page: {
     minHeight: "100vh",
     background: "#f6f7fb",
@@ -479,10 +468,13 @@ const styles = {
   insightName: { margin: "10px 0 6px", fontSize: 24, fontWeight: 900 },
   insightDetail: { margin: 0, color: "#cbd5e1", lineHeight: 1.6 },
   negativeText: { color: "#9f1239", fontWeight: 800 },
+  warningText: { color: "#b45309", fontWeight: 800 },
   card: { background: "white", borderRadius: 20, padding: 24, boxShadow: "0 10px 30px rgba(15, 23, 42, 0.07)", marginBottom: 24, overflowX: "auto" },
   cardHeader: { display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 18 },
   cardTitle: { margin: "0 0 8px", fontSize: 22 },
   smallText: { margin: 0, color: "#64748b", lineHeight: 1.6 },
+  budgetBox: { marginTop: 16, marginBottom: 20, maxWidth: 360 },
+  budgetShareText: { margin: "8px 0 0", fontSize: 13, color: "#64748b" },
   optionArea: { display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" },
   checkboxRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#475569", cursor: "pointer" },
   inputList: { display: "grid", gap: 16 },
@@ -491,13 +483,16 @@ const styles = {
   measureNameInput: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "12px 12px", fontSize: 18, fontWeight: 800, boxSizing: "border-box" },
   fieldGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 },
   field: { display: "grid", gap: 8 },
+  sliderField: { display: "grid", gap: 8, alignSelf: "end" },
   label: { color: "#475569", fontSize: 14, fontWeight: 700 },
   inputRow: { display: "flex", gap: 8, alignItems: "center" },
   input: { width: "100%", border: "1px solid #cbd5e1", borderRadius: 12, padding: "12px 12px", fontSize: 16, boxSizing: "border-box" },
   suffix: { width: 36, color: "#64748b", fontSize: 14 },
+  range: { width: "100%" },
   chartBlock: { marginBottom: 42 },
   graphTitle: { margin: "0 0 14px", fontSize: 18, fontWeight: 800 },
   chartBox: { width: "100%", height: 340 },
+  pieBox: { width: "100%", height: 380 },
   tableScroll: { width: "100%", overflowX: "auto" },
   table: { width: "100%", minWidth: 980, borderCollapse: "collapse", fontSize: 14 },
   th: { textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0", padding: 12, whiteSpace: "nowrap" },

@@ -259,8 +259,10 @@ export default function App() {
     </ResponsiveContainer>
   </div>
 </div>
-            
-            <div style={{ width: "100%", height: 320, marginBottom: 30 }}>
+
+                       <div style={{ marginBottom: 40 }}>
+  <h3 style={styles.graphTitle}>CPA比較</h3>
+  <div style={{ width: "100%", height: 320 }}>
                 <ResponsiveContainer>
                     <BarChart data={results}>
                     <XAxis dataKey="name" />
@@ -271,8 +273,10 @@ export default function App() {
                 </ResponsiveContainer>
             </div>
 
-            div style={{ width: "100%", height: 320, marginBottom: 30 }}>
-  <ResponsiveContainer>
+                       <div style={{ marginBottom: 40 }}>
+  <h3 style={styles.graphTitle}>CV比較</h3>
+  <div style={{ width: "100%", height: 320 }}>
+    <ResponsiveContainer>
     <BarChart data={results}>
       <XAxis dataKey="name" />
       <YAxis />

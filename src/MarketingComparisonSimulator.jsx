@@ -244,6 +244,18 @@ export default function App() {
 
         <section style={styles.card}>
           <h2 style={styles.cardTitle}>施策比較結果</h2>
+
+          <div style={{ width: "100%", height: 320, marginBottom: 30 }}>
+            <ResponsiveContainer>
+                <BarChart data={results}>
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+            <Bar dataKey="roi" />
+        </BarChart>
+  </ResponsiveContainer>
+</div>
+
           <div style={styles.tableScroll}>
             <table style={styles.table}>
               <thead>

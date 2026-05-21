@@ -248,9 +248,20 @@ export default function App() {
                 </div>
 
                 <div style={styles.fieldGrid}>
-                  <Field label="流入数" value={item.sessions} onChange={(value) => updateMeasure(item.id, "sessions", value)} suffix="PV" />
-                  <Field label="CVR" value={item.cvr} onChange={(value) => updateMeasure(item.id, "cvr", value)} suffix="%" />
-                <Field  label="予算配分"  value={item.budgetShare}  onChange={(value) =>    updateMeasure(item.id, "budgetShare", value)  }  suffix="%"/>                  <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
+                    <Field label="流入数" value={item.sessions} onChange={(value) => updateMeasure(item.id, "sessions", value)} suffix="PV" />
+                    <Field label="CVR" value={item.cvr} onChange={(value) => updateMeasure(item.id, "cvr", value)} suffix="%" />
+                    <Field label="予算配分" value={item.budgetShare}  onChange={(value) =>  updateMeasure(item.id, "budgetShare", value) } suffix="%" />                  
+                    <input
+  type="range"
+  min="0"
+  max="100"
+  value={item.budgetShare}
+  onChange={(e) =>
+    updateMeasure(item.id, "budgetShare", e.target.value)
+  }
+  style={styles.range}
+/>
+                    <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
                 </div>
               </div>
             ))}

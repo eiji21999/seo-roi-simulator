@@ -684,5 +684,5 @@ const printAndResponsiveCss = `
     .no-print { display: none !important; }
     div { box-shadow: none !important; }
     table { font-size: 10px !important; }
-  }
+  } 
 `;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -16,45 +16,28 @@ import {
 const BLUE = "#1d4ed8";
 const COLORS = ["#1d4ed8", "#2563eb", "#38bdf8", "#0f172a", "#64748b"];
 
-const createInfluencer = (index = 1) => ({
-  id: Date.now() + index,
-  name: `インフルエンサー${index}`,
-  sns: "Instagram",
-  followers: 10000,
-  views: 5000,
-  engagementRate: 3,
-  cost: 100000,
-  cvr: 1,
-  averageOrderValue: 30000,
-
-  saveRate: 2,
-  profileClickRate: 1,
-  storyCtr: 1,
-
-  watchRetentionRate: 40,
-  shareRate: 2,
-  viralScore: 50,
-
-  averageWatchTime: 180,
-  descriptionCtr: 1,
-  subscribeRate: 0.5,
-
-  impressions: 30000,
-  repostRate: 1,
-  linkCtr: 1,
-});
-
 const initialInfluencers = [
   {
-    ...createInfluencer(1),
     id: 1,
-    name: "旅行系Instagram",
+    name: "インフルエンサーA",
+    sns: "Instagram",
     followers: 50000,
     views: 20000,
+    engagementRate: 3,
     cost: 150000,
-    saveRate: 4,
-    profileClickRate: 2,
-    storyCtr: 1.2,
+    cvr: 1,
+    averageOrderValue: 30000,
+  },
+  {
+    id: 2,
+    name: "インフルエンサーB",
+    sns: "TikTok",
+    followers: 120000,
+    views: 50000,
+    engagementRate: 5,
+    cost: 250000,
+    cvr: 0.8,
+    averageOrderValue: 30000,
   },
 ];
 
@@ -68,8 +51,6 @@ const formatYen = (num) =>
 const formatNumber = (num) =>
   new Intl.NumberFormat("ja-JP").format(Math.round(num || 0));
 
-const toNumber = (value) => Number(value) || 0;
-
 export default function InfluencerComparisonSimulator() {
   const [influencers, setInfluencers] = useState(initialInfluencers);
   const [copied, setCopied] = useState(false);
@@ -78,69 +59,37 @@ export default function InfluencerComparisonSimulator() {
     const params = new URLSearchParams(window.location.search);
     const data = params.get("data");
 
-    if (!data) return;
-
-    try {
-      const decoded = JSON.parse(decodeURIComponent(atob(data)));
-      if (Array.isArray(decoded)) setInfluencers(decoded);
-    } catch {
-      console.log("URLデータの復元に失敗しました");
+    if (data) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(atob(data)));
+        if (Array.isArray(decoded)) setInfluencers(decoded);
+      } catch {
+        console.log("URLデータの復元に失敗しました");
+      }
     }
   }, []);
 
   const calculated = useMemo(() => {
     return influencers.map((item) => {
-      const baseReach = item.sns === "X" ? item.impressions : item.views;
-      const conversions = baseReach * (item.cvr / 100);
+      const conversions = item.views * (item.cvr / 100);
       const sales = conversions * item.averageOrderValue;
       const profit = sales - item.cost;
       const roi = item.cost > 0 ? (profit / item.cost) * 100 : 0;
       const cpa = conversions > 0 ? item.cost / conversions : 0;
-
-      let rawPlatformScore = 50;
-
-      if (item.sns === "Instagram") {
-        rawPlatformScore =
-          item.saveRate * 10 +
-          item.profileClickRate * 10 +
-          item.storyCtr * 15 +
-          item.engagementRate * 5;
-      }
-
-      if (item.sns === "TikTok") {
-        rawPlatformScore =
-          item.watchRetentionRate + item.shareRate * 15 + item.viralScore;
-      }
-
-      if (item.sns === "YouTube") {
-        rawPlatformScore =
-          item.averageWatchTime / 10 +
-          item.descriptionCtr * 20 +
-          item.subscribeRate * 25;
-      }
-
-      if (item.sns === "X") {
-        rawPlatformScore =
-          item.linkCtr * 20 + item.repostRate * 15 + item.engagementRate * 5;
-      }
-
-      const platformScore = Math.max(0, Math.min(100, rawPlatformScore));
-      const totalScore = roi * 0.6 + platformScore * 0.4;
+      const engagement = item.views * (item.engagementRate / 100);
 
       let rank = "C";
-      if (roi >= 100 && platformScore >= 75) rank = "A";
-      else if (roi >= 0 && platformScore >= 50) rank = "B";
+      if (roi >= 100 && cpa <= item.averageOrderValue * 0.4) rank = "A";
+      else if (roi >= 0) rank = "B";
 
       return {
         ...item,
-        baseReach,
         conversions,
         sales,
         profit,
         roi,
         cpa,
-        platformScore,
-        totalScore,
+        engagement,
         rank,
       };
     });
@@ -149,6 +98,7 @@ export default function InfluencerComparisonSimulator() {
   const summary = useMemo(() => {
     const totalSales = calculated.reduce((sum, item) => sum + item.sales, 0);
     const totalProfit = calculated.reduce((sum, item) => sum + item.profit, 0);
+    const totalCost = calculated.reduce((sum, item) => sum + item.cost, 0);
 
     const averageROI =
       calculated.length > 0
@@ -162,12 +112,12 @@ export default function InfluencerComparisonSimulator() {
           calculated.length
         : 0;
 
-    return { totalSales, totalProfit, averageROI, averageCPA };
+    return { totalSales, totalProfit, totalCost, averageROI, averageCPA };
   }, [calculated]);
 
   const bestInfluencer = useMemo(() => {
     if (calculated.length === 0) return null;
-    return [...calculated].sort((a, b) => b.totalScore - a.totalScore)[0];
+    return [...calculated].sort((a, b) => b.roi - a.roi)[0];
   }, [calculated]);
 
   const pieData = calculated.map((item) => ({
@@ -181,7 +131,7 @@ export default function InfluencerComparisonSimulator() {
         item.id === id
           ? {
               ...item,
-              [key]: key === "name" || key === "sns" ? value : toNumber(value),
+              [key]: key === "name" || key === "sns" ? value : Number(value),
             }
           : item
       )
@@ -189,7 +139,20 @@ export default function InfluencerComparisonSimulator() {
   };
 
   const addInfluencer = () => {
-    setInfluencers((prev) => [...prev, createInfluencer(prev.length + 1)]);
+    setInfluencers((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        name: `インフルエンサー${prev.length + 1}`,
+        sns: "Instagram",
+        followers: 10000,
+        views: 5000,
+        engagementRate: 3,
+        cost: 100000,
+        cvr: 1,
+        averageOrderValue: 30000,
+      },
+    ]);
   };
 
   const deleteInfluencer = (id) => {
@@ -200,30 +163,17 @@ export default function InfluencerComparisonSimulator() {
     const header = [
       "名前",
       "SNS",
-      "フォロワー",
-      "再生数",
-      "インプレッション",
+      "フォロワー数",
+      "平均再生数",
       "エンゲージメント率",
       "費用",
       "CVR",
       "客単価",
-      "保存率",
-      "プロフィール遷移率",
-      "ストーリーCTR",
-      "視聴維持率",
-      "シェア率",
-      "バズ期待度",
-      "平均視聴時間",
-      "概要欄CTR",
-      "登録転換率",
-      "リポスト率",
-      "リンクCTR",
       "CV数",
       "売上",
       "利益",
       "CPA",
       "ROI",
-      "SNS適性スコア",
       "判定",
     ];
 
@@ -232,28 +182,15 @@ export default function InfluencerComparisonSimulator() {
       item.sns,
       item.followers,
       item.views,
-      item.impressions,
       item.engagementRate,
       item.cost,
       item.cvr,
       item.averageOrderValue,
-      item.saveRate,
-      item.profileClickRate,
-      item.storyCtr,
-      item.watchRetentionRate,
-      item.shareRate,
-      item.viralScore,
-      item.averageWatchTime,
-      item.descriptionCtr,
-      item.subscribeRate,
-      item.repostRate,
-      item.linkCtr,
       item.conversions.toFixed(1),
       Math.round(item.sales),
       Math.round(item.profit),
       Math.round(item.cpa),
       item.roi.toFixed(1),
-      item.platformScore.toFixed(1),
       item.rank,
     ]);
 
@@ -285,36 +222,22 @@ export default function InfluencerComparisonSimulator() {
         const cols = line.split(",");
 
         return {
-          ...createInfluencer(index + 1),
           id: Date.now() + index,
           name: cols[0] || `インフルエンサー${index + 1}`,
           sns: cols[1] || "Instagram",
-          followers: toNumber(cols[2]),
-          views: toNumber(cols[3]),
-          impressions: toNumber(cols[4]),
-          engagementRate: toNumber(cols[5]),
-          cost: toNumber(cols[6]),
-          cvr: toNumber(cols[7]),
-          averageOrderValue: toNumber(cols[8]),
-          saveRate: toNumber(cols[9]),
-          profileClickRate: toNumber(cols[10]),
-          storyCtr: toNumber(cols[11]),
-          watchRetentionRate: toNumber(cols[12]),
-          shareRate: toNumber(cols[13]),
-          viralScore: toNumber(cols[14]),
-          averageWatchTime: toNumber(cols[15]),
-          descriptionCtr: toNumber(cols[16]),
-          subscribeRate: toNumber(cols[17]),
-          repostRate: toNumber(cols[18]),
-          linkCtr: toNumber(cols[19]),
+          followers: Number(cols[2]) || 0,
+          views: Number(cols[3]) || 0,
+          engagementRate: Number(cols[4]) || 0,
+          cost: Number(cols[5]) || 0,
+          cvr: Number(cols[6]) || 0,
+          averageOrderValue: Number(cols[7]) || 0,
         };
       });
 
-      if (imported.length > 0) setInfluencers(imported);
+      setInfluencers(imported);
     };
 
     reader.readAsText(file);
-    event.target.value = "";
   };
 
   const shareURL = async () => {
@@ -333,21 +256,18 @@ export default function InfluencerComparisonSimulator() {
   const aiComments = useMemo(() => {
     if (!bestInfluencer) return [];
 
-    return calculated.map((item) => {
-      if (item.sns === "Instagram") {
-        return `${item.name}：Instagramでは保存率・プロフィール遷移率・ストーリーCTRが重要です。ホテル、旅行、美容系では保存率が高い候補を優先すると相性が良いです。`;
-      }
+    const worstCpa = [...calculated].sort((a, b) => b.cpa - a.cpa)[0];
+    const bestCpa = [...calculated].sort((a, b) => a.cpa - b.cpa)[0];
+    const highCost = [...calculated].sort((a, b) => b.cost - a.cost)[0];
 
-      if (item.sns === "TikTok") {
-        return `${item.name}：TikTokでは視聴維持率とシェア率が重要です。認知拡大や話題化を狙う場合に向いています。`;
-      }
-
-      if (item.sns === "YouTube") {
-        return `${item.name}：YouTubeでは平均視聴時間と概要欄CTRが重要です。高単価商材や比較検討型の訴求と相性が良いです。`;
-      }
-
-      return `${item.name}：Xではインプレッション、リポスト率、リンクCTRが重要です。拡散力や話題化を狙う施策に向いています。`;
-    });
+    return [
+      `現時点では「${bestInfluencer.name}」が最もROIが高い候補です。`,
+      `CPA効率では「${bestCpa.name}」が優秀です。`,
+      `「${highCost.name}」は費用が最も高いため、実施前に想定CVRの妥当性確認がおすすめです。`,
+      worstCpa?.roi < 0
+        ? `「${worstCpa.name}」は利益がマイナスになる可能性があるため、費用交渉または見送り候補です。`
+        : `全体として、費用・再生数・CVRのバランスを見ながら選定するのが安全です。`,
+    ];
   }, [calculated, bestInfluencer]);
 
   return (
@@ -356,7 +276,7 @@ export default function InfluencerComparisonSimulator() {
         <div>
           <h1 style={styles.title}>Influencer ROI Simulator</h1>
           <p style={styles.subtitle}>
-            SNS媒体ごとの適性も含めてインフルエンサー施策を比較できます。
+            SNSインフルエンサー施策の費用対効果を比較できます。
           </p>
         </div>
 
@@ -370,15 +290,12 @@ export default function InfluencerComparisonSimulator() {
               style={{ display: "none" }}
             />
           </label>
-
           <button style={styles.secondaryButton} onClick={exportCSV}>
             CSV出力
           </button>
-
           <button style={styles.secondaryButton} onClick={printPDF}>
             PDF保存
           </button>
-
           <button style={styles.primaryButton} onClick={shareURL}>
             {copied ? "コピー済み" : "URL共有"}
           </button>
@@ -386,14 +303,14 @@ export default function InfluencerComparisonSimulator() {
       </div>
 
       <div style={styles.kpiGrid}>
-        <KpiCard title="総売上" value={formatYen(summary.totalSales)} />
-        <KpiCard
+        <Kpi title="総売上" value={formatYen(summary.totalSales)} />
+        <Kpi
           title="総利益"
           value={formatYen(summary.totalProfit)}
           danger={summary.totalProfit < 0}
         />
-        <KpiCard title="平均ROI" value={`${summary.averageROI.toFixed(1)}%`} />
-        <KpiCard title="平均CPA" value={formatYen(summary.averageCPA)} />
+        <Kpi title="平均ROI" value={`${summary.averageROI.toFixed(1)}%`} />
+        <Kpi title="平均CPA" value={formatYen(summary.averageCPA)} />
       </div>
 
       {bestInfluencer && (
@@ -402,7 +319,8 @@ export default function InfluencerComparisonSimulator() {
             <p style={styles.label}>おすすめ候補</p>
             <h2 style={styles.bestName}>{bestInfluencer.name}</h2>
             <p style={styles.bestText}>
-              ROIとSNS適性スコアを総合すると、この候補が最も有力です。
+              ROIが最も高く、想定利益は {formatYen(bestInfluencer.profit)}{" "}
+              です。
             </p>
           </div>
           <div style={styles.rankBadge}>Rank {bestInfluencer.rank}</div>
@@ -413,7 +331,7 @@ export default function InfluencerComparisonSimulator() {
         <div style={styles.cardHeader}>
           <h2 style={styles.sectionTitle}>インフルエンサー入力</h2>
           <button style={styles.primaryButton} onClick={addInfluencer}>
-            ＋追加
+            ＋ 追加
           </button>
         </div>
 
@@ -428,7 +346,6 @@ export default function InfluencerComparisonSimulator() {
                     updateInfluencer(item.id, "name", e.target.value)
                   }
                 />
-
                 <button
                   style={styles.deleteButton}
                   onClick={() => deleteInfluencer(item.id)}
@@ -453,168 +370,78 @@ export default function InfluencerComparisonSimulator() {
               </Field>
 
               <Field label="フォロワー数">
-                <NumberInput
+                <input
+                  style={styles.input}
+                  type="number"
                   value={item.followers}
-                  onChange={(value) =>
-                    updateInfluencer(item.id, "followers", value)
+                  onChange={(e) =>
+                    updateInfluencer(item.id, "followers", e.target.value)
                   }
                 />
               </Field>
 
               <Field label="平均再生数 / 表示回数">
-                <NumberInput
+                <input
+                  style={styles.input}
+                  type="number"
                   value={item.views}
-                  onChange={(value) => updateInfluencer(item.id, "views", value)}
+                  onChange={(e) =>
+                    updateInfluencer(item.id, "views", e.target.value)
+                  }
                 />
               </Field>
 
               <Field label="エンゲージメント率（%）">
-                <NumberInput
+                <input
+                  style={styles.input}
+                  type="number"
                   value={item.engagementRate}
-                  onChange={(value) =>
-                    updateInfluencer(item.id, "engagementRate", value)
+                  onChange={(e) =>
+                    updateInfluencer(
+                      item.id,
+                      "engagementRate",
+                      e.target.value
+                    )
                   }
                 />
               </Field>
 
               <Field label="投稿費用（円）">
-                <NumberInput
+                <input
+                  style={styles.input}
+                  type="number"
                   value={item.cost}
-                  onChange={(value) => updateInfluencer(item.id, "cost", value)}
-                />
-              </Field>
-
-              <Field label="想定CVR（%）">
-                <NumberInput
-                  value={item.cvr}
-                  onChange={(value) => updateInfluencer(item.id, "cvr", value)}
-                />
-              </Field>
-
-              <Field label="客単価（円）">
-                <NumberInput
-                  value={item.averageOrderValue}
-                  onChange={(value) =>
-                    updateInfluencer(item.id, "averageOrderValue", value)
+                  onChange={(e) =>
+                    updateInfluencer(item.id, "cost", e.target.value)
                   }
                 />
               </Field>
 
-              {item.sns === "Instagram" && (
-                <>
-                  <Field label="保存率（%）">
-                    <NumberInput
-                      value={item.saveRate}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "saveRate", value)
-                      }
-                    />
-                  </Field>
-                  <Field label="プロフィール遷移率（%）">
-                    <NumberInput
-                      value={item.profileClickRate}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "profileClickRate", value)
-                      }
-                    />
-                  </Field>
-                  <Field label="ストーリーCTR（%）">
-                    <NumberInput
-                      value={item.storyCtr}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "storyCtr", value)
-                      }
-                    />
-                  </Field>
-                </>
-              )}
+              <Field label="想定CVR（%）">
+                <input
+                  style={styles.input}
+                  type="number"
+                  value={item.cvr}
+                  onChange={(e) =>
+                    updateInfluencer(item.id, "cvr", e.target.value)
+                  }
+                />
+              </Field>
 
-              {item.sns === "TikTok" && (
-                <>
-                  <Field label="視聴維持率（%）">
-                    <NumberInput
-                      value={item.watchRetentionRate}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "watchRetentionRate", value)
-                      }
-                    />
-                  </Field>
-                  <Field label="シェア率（%）">
-                    <NumberInput
-                      value={item.shareRate}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "shareRate", value)
-                      }
-                    />
-                  </Field>
-                  <Field label="バズ期待度（0〜100）">
-                    <NumberInput
-                      value={item.viralScore}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "viralScore", value)
-                      }
-                    />
-                  </Field>
-                </>
-              )}
-
-              {item.sns === "YouTube" && (
-                <>
-                  <Field label="平均視聴時間（秒）">
-                    <NumberInput
-                      value={item.averageWatchTime}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "averageWatchTime", value)
-                      }
-                    />
-                  </Field>
-                  <Field label="概要欄CTR（%）">
-                    <NumberInput
-                      value={item.descriptionCtr}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "descriptionCtr", value)
-                      }
-                    />
-                  </Field>
-                  <Field label="登録転換率（%）">
-                    <NumberInput
-                      value={item.subscribeRate}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "subscribeRate", value)
-                      }
-                    />
-                  </Field>
-                </>
-              )}
-
-              {item.sns === "X" && (
-                <>
-                  <Field label="インプレッション">
-                    <NumberInput
-                      value={item.impressions}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "impressions", value)
-                      }
-                    />
-                  </Field>
-                  <Field label="リポスト率（%）">
-                    <NumberInput
-                      value={item.repostRate}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "repostRate", value)
-                      }
-                    />
-                  </Field>
-                  <Field label="リンクCTR（%）">
-                    <NumberInput
-                      value={item.linkCtr}
-                      onChange={(value) =>
-                        updateInfluencer(item.id, "linkCtr", value)
-                      }
-                    />
-                  </Field>
-                </>
-              )}
+              <Field label="客単価（円）">
+                <input
+                  style={styles.input}
+                  type="number"
+                  value={item.averageOrderValue}
+                  onChange={(e) =>
+                    updateInfluencer(
+                      item.id,
+                      "averageOrderValue",
+                      e.target.value
+                    )
+                  }
+                />
+              </Field>
             </div>
           ))}
         </div>
@@ -622,7 +449,7 @@ export default function InfluencerComparisonSimulator() {
 
       <div style={styles.twoColumn}>
         <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>ROI比較</h2>
+          <h2 style={styles.sectionTitle}>ROI比較グラフ</h2>
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer>
               <BarChart data={calculated}>
@@ -641,7 +468,13 @@ export default function InfluencerComparisonSimulator() {
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={100} label>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={105}
+                  label
+                >
                   {pieData.map((_, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -663,13 +496,13 @@ export default function InfluencerComparisonSimulator() {
                 {[
                   "名前",
                   "SNS",
-                  "基準リーチ",
+                  "再生数",
+                  "費用",
                   "CV数",
                   "売上",
                   "利益",
                   "CPA",
                   "ROI",
-                  "SNS適性",
                   "判定",
                 ].map((head) => (
                   <th key={head} style={styles.th}>
@@ -684,7 +517,8 @@ export default function InfluencerComparisonSimulator() {
                 <tr key={item.id}>
                   <td style={styles.td}>{item.name}</td>
                   <td style={styles.td}>{item.sns}</td>
-                  <td style={styles.td}>{formatNumber(item.baseReach)}</td>
+                  <td style={styles.td}>{formatNumber(item.views)}</td>
+                  <td style={styles.td}>{formatYen(item.cost)}</td>
                   <td style={styles.td}>{formatNumber(item.conversions)}</td>
                   <td style={styles.td}>{formatYen(item.sales)}</td>
                   <td
@@ -698,7 +532,6 @@ export default function InfluencerComparisonSimulator() {
                   </td>
                   <td style={styles.td}>{formatYen(item.cpa)}</td>
                   <td style={styles.td}>{item.roi.toFixed(1)}%</td>
-                  <td style={styles.td}>{item.platformScore.toFixed(1)}</td>
                   <td style={styles.td}>
                     <span style={styles.smallBadge}>Rank {item.rank}</span>
                   </td>
@@ -711,9 +544,6 @@ export default function InfluencerComparisonSimulator() {
 
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>AI分析コメント</h2>
-        <p style={styles.comment}>
-          総合おすすめは「{bestInfluencer?.name}」です。ROIだけでなく、SNS適性スコアも加味して判定しています。
-        </p>
         <ul style={styles.commentList}>
           {aiComments.map((comment, index) => (
             <li key={index}>{comment}</li>
@@ -724,27 +554,7 @@ export default function InfluencerComparisonSimulator() {
   );
 }
 
-function NumberInput({ value, onChange }) {
-  return (
-    <input
-      style={styles.input}
-      type="number"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <label style={styles.field}>
-      <span style={styles.fieldLabel}>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function KpiCard({ title, value, danger }) {
+function Kpi({ title, value, danger }) {
   return (
     <div style={styles.kpiCard}>
       <p style={styles.kpiLabel}>{title}</p>
@@ -760,6 +570,15 @@ function KpiCard({ title, value, danger }) {
   );
 }
 
+function Field({ label, children }) {
+  return (
+    <label style={styles.field}>
+      <span style={styles.fieldLabel}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
 const styles = {
   page: {
     minHeight: "100vh",
@@ -769,14 +588,15 @@ const styles = {
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   header: {
+    marginBottom: "24px",
     display: "flex",
     justifyContent: "space-between",
     gap: "16px",
+    alignItems: "flex-start",
     flexWrap: "wrap",
-    marginBottom: "24px",
   },
   title: {
-    fontSize: "32px",
+    fontSize: "30px",
     fontWeight: 800,
     margin: 0,
   },
@@ -814,15 +634,17 @@ const styles = {
     marginBottom: "24px",
   },
   kpiCard: {
-    background: "#fff",
+    background: "#ffffff",
     borderRadius: "20px",
     padding: "22px",
     boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+    border: "1px solid #e2e8f0",
   },
   kpiLabel: {
+    margin: 0,
     fontSize: "13px",
     color: "#64748b",
-    margin: 0,
+    fontWeight: 700,
   },
   kpiValue: {
     margin: "10px 0 0",
@@ -839,14 +661,16 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     gap: "16px",
+    boxShadow: "0 12px 28px rgba(29,78,216,0.25)",
   },
   label: {
     margin: 0,
+    opacity: 0.85,
     fontSize: "13px",
   },
   bestName: {
+    margin: "6px 0",
     fontSize: "26px",
-    margin: "8px 0",
   },
   bestText: {
     margin: 0,
@@ -854,8 +678,8 @@ const styles = {
   rankBadge: {
     background: "#fff",
     color: BLUE,
-    borderRadius: "999px",
     padding: "12px 18px",
+    borderRadius: "999px",
     fontWeight: 800,
     whiteSpace: "nowrap",
   },
@@ -870,15 +694,16 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "18px",
+    gap: "12px",
+    marginBottom: "20px",
   },
   sectionTitle: {
     fontSize: "20px",
-    margin: 0,
+    margin: "0 0 18px",
   },
   inputGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: "18px",
   },
   inputCard: {
@@ -900,13 +725,13 @@ const styles = {
     fontWeight: 700,
   },
   deleteButton: {
-    background: "#fee2e2",
-    color: "#991b1b",
     border: "none",
     borderRadius: "10px",
+    background: "#fee2e2",
+    color: "#991b1b",
     padding: "8px 10px",
-    fontWeight: 700,
     cursor: "pointer",
+    fontWeight: 700,
   },
   field: {
     display: "block",
@@ -914,10 +739,10 @@ const styles = {
   },
   fieldLabel: {
     display: "block",
-    marginBottom: "5px",
     fontSize: "13px",
-    fontWeight: 700,
     color: "#475569",
+    marginBottom: "5px",
+    fontWeight: 700,
   },
   input: {
     width: "100%",
@@ -925,6 +750,7 @@ const styles = {
     padding: "10px",
     borderRadius: "10px",
     border: "1px solid #cbd5e1",
+    background: "#fff",
   },
   twoColumn: {
     display: "grid",
@@ -937,14 +763,15 @@ const styles = {
   table: {
     width: "100%",
     borderCollapse: "collapse",
+    fontSize: "14px",
     minWidth: "900px",
   },
   th: {
     textAlign: "left",
     padding: "12px",
     borderBottom: "1px solid #e2e8f0",
-    fontSize: "13px",
     color: "#475569",
+    fontSize: "13px",
     whiteSpace: "nowrap",
   },
   td: {
@@ -958,10 +785,6 @@ const styles = {
     padding: "6px 10px",
     borderRadius: "999px",
     fontWeight: 800,
-  },
-  comment: {
-    color: "#334155",
-    lineHeight: 1.8,
   },
   commentList: {
     lineHeight: 1.9,

@@ -271,6 +271,17 @@ export default function App() {
                 </ResponsiveContainer>
             </div>
 
+            div style={{ width: "100%", height: 320, marginBottom: 30 }}>
+  <ResponsiveContainer>
+    <BarChart data={results}>
+      <XAxis dataKey="name" />
+      <YAxis />
+      <Tooltip />
+      <Bar dataKey="cv" />
+    </BarChart>
+  </ResponsiveContainer>
+</div>
+
           <div style={styles.tableScroll}>
             <table style={styles.table}>
               <thead>

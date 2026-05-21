@@ -15,12 +15,13 @@ import {
 
 const initialMeasures = [
   {
-    id: 1,
-    name: "SEO",
-    sessions: "5000",
-    cvr: "1.2",
-    cost: "200000",
-    revenuePerCv: "300000",
+  id: 1,
+  name: "SEO",
+  sessions: "5000",
+  cvr: "1.2",
+  cost: "200000",
+  revenuePerCv: "300000",
+  budgetShare: "30",
   },
   {
     id: 2,
@@ -29,6 +30,7 @@ const initialMeasures = [
     cvr: "2.5",
     cost: "500000",
     revenuePerCv: "300000",
+    budgetShare: "50",
   },
   {
     id: 3,
@@ -37,6 +39,7 @@ const initialMeasures = [
     cvr: "0.8",
     cost: "300000",
     revenuePerCv: "300000",
+    budgetShare: "20",
   },
 ];
 
@@ -89,6 +92,7 @@ export default function App() {
         id: nextId,
         name: "新規施策",
         sessions: "0",
+        budgetShare: "0",
         cvr: "0",
         cost: "0",
         revenuePerCv: "0",
@@ -246,8 +250,7 @@ export default function App() {
                 <div style={styles.fieldGrid}>
                   <Field label="流入数" value={item.sessions} onChange={(value) => updateMeasure(item.id, "sessions", value)} suffix="PV" />
                   <Field label="CVR" value={item.cvr} onChange={(value) => updateMeasure(item.id, "cvr", value)} suffix="%" />
-                  <Field label="施策費用" value={item.cost} onChange={(value) => updateMeasure(item.id, "cost", value)} suffix="円" />
-                  <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
+                <Field  label="予算配分"  value={item.budgetShare}  onChange={(value) =>    updateMeasure(item.id, "budgetShare", value)  }  suffix="%"/>                  <Field label="1CVあたり売上" value={item.revenuePerCv} onChange={(value) => updateMeasure(item.id, "revenuePerCv", value)} suffix="円" />
                 </div>
               </div>
             ))}
@@ -311,6 +314,7 @@ export default function App() {
                   <Th>流入数</Th>
                   <Th>CVR</Th>
                   <Th>CV数</Th>
+                  <Th>予算配分</Th>
                   <Th>費用</Th>
                   <Th>CPA</Th>
                   <Th>売上</Th>
@@ -329,6 +333,7 @@ export default function App() {
                       <Td>{comma(item.sessions)}</Td>
                       <Td>{item.cvr}%</Td>
                       <Td>{roundNumbers ? Math.round(item.cv) : comma(item.cv)}</Td>
+                      <Td>{item.budgetShare}%</Td>
                       <Td>{yen(item.cost)}</Td>
                       <Td>{yen(item.cpa)}</Td>
                       <Td>{yen(item.revenue)}</Td>

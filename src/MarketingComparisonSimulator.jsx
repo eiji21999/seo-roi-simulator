@@ -7,6 +7,10 @@ import {
   Tooltip,
   ResponsiveContainer,
   LabelList,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
 const initialMeasures = [
@@ -256,6 +260,48 @@ export default function App() {
           <ChartBlock title="ROI比較" data={results} dataKey="roi" tooltipFormatter={formatTooltip} labelFormatter={(v) => Number(v).toFixed(0) + "%"} />
           <ChartBlock title="CPA比較" data={results} dataKey="cpa" tooltipFormatter={formatTooltip} labelFormatter={(v) => yen(v)} />
           <ChartBlock title="CV数比較" data={results} dataKey="cv" tooltipFormatter={formatTooltip} labelFormatter={(v) => roundNumbers ? Math.round(v) + "件" : comma(v) + "件"} />
+
+<div style={styles.chartBlock}>
+  <h3 style={styles.graphTitle}>施策別費用割合</h3>
+
+  <div style={{ width: "100%", height: 380 }}>
+    <ResponsiveContainer>
+      <PieChart>
+        <Pie
+          data={results}
+          dataKey="cost"
+          nameKey="name"
+          outerRadius={130}
+          label={({ name, percent }) =>
+            `${name} ${(percent * 100).toFixed(0)}%`
+          }
+        >
+          {results.map((entry, index) => {
+            const colors = [
+              "#1d4ed8",
+              "#2563eb",
+              "#3b82f6",
+              "#60a5fa",
+              "#93c5fd",
+            ];
+
+            return (
+              <Cell
+                key={`cell-${index}`}
+                fill={colors[index % colors.length]}
+              />
+            );
+          })}
+        </Pie>
+
+        <Tooltip formatter={(value) => yen(value)} />
+
+        <Legend />
+      </PieChart>
+    </ResponsiveContainer>
+  </div>
+</div>
+
 
           <div style={styles.tableScroll}>
             <table style={styles.table}>

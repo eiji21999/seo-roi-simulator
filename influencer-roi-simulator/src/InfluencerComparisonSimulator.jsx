@@ -73,6 +73,7 @@ const toNumber = (value) => Number(value) || 0;
 export default function InfluencerComparisonSimulator() {
   const [influencers, setInfluencers] = useState(initialInfluencers);
   const [copied, setCopied] = useState(false);
+  const [helpModal, setHelpModal] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -721,36 +722,124 @@ export default function InfluencerComparisonSimulator() {
         </ul>
       </div>
       <div style={styles.card}>
-  <h2 style={styles.sectionTitle}>判定基準ヘルプ</h2>
+    <h2 style={styles.sectionTitle}>判定基準ヘルプ</h2>
 
-  <div style={styles.helpBox}>
-    <h3 style={styles.helpTitle}>SNS適性スコア</h3>
-    <p style={styles.helpText}>
+        <div style={styles.helpBox}>
+            <h3 style={styles.helpTitle}>SNS適性スコア</h3>
+            <p style={styles.helpText}>
       SNSごとに重要な指標を点数化したものです。Instagramは保存率やプロフィール遷移率、TikTokは視聴維持率やシェア率、YouTubeは平均視聴時間や概要欄CTR、XはリンクCTRやリポスト率を重視しています。
-    </p>
-  </div>
+            </p>
+        </div>
 
-  <div style={styles.helpBox}>
-    <h3 style={styles.helpTitle}>Rank A</h3>
-    <p style={styles.helpText}>
+        <div style={styles.helpBox}>
+            <h3 style={styles.helpTitle}>Rank A</h3>
+            <p style={styles.helpText}>
       ROIが100%以上、かつSNS適性スコアが75以上の候補です。費用対効果と媒体相性の両方が高い候補として判定されます。
-    </p>
-  </div>
+            </p>
+        </div>
 
-  <div style={styles.helpBox}>
-    <h3 style={styles.helpTitle}>Rank B</h3>
-    <p style={styles.helpText}>
+        <div style={styles.helpBox}>
+            <h3 style={styles.helpTitle}>Rank B</h3>
+            <p style={styles.helpText}>
       ROIが0%以上、かつSNS適性スコアが50以上の候補です。最低限の利益が見込め、媒体相性も一定以上ある候補です。
-    </p>
-  </div>
+            </p>
+        </div>
 
-  <div style={styles.helpBox}>
-    <h3 style={styles.helpTitle}>Rank C</h3>
-    <p style={styles.helpText}>
+        <div style={styles.helpBox}>
+            <h3 style={styles.helpTitle}>Rank C</h3>
+            <p style={styles.helpText}>
       ROIまたはSNS適性スコアが基準を下回る候補です。費用交渉、投稿内容の見直し、または見送りを検討する候補です。
-    </p>
+            </p>
+        </div>
+    </div>
+
+
+
+
+    <div style={styles.helpLinks}>
+        <button
+        style={styles.helpLink}
+        onClick={() =>
+          setHelpModal("score")
+        }
+        >
+        推奨度とは？
+        </button>
+
+        <button
+         style={styles.helpLink}
+         onClick={() =>
+          setHelpModal("average")
+            } 
+        >
+        業界平均比とは？
+        </button>
+    </div>
+
+    {helpModal && (
+    <div style={styles.modalOverlay}>
+        <div style={styles.modal}>
+            <button
+            style={styles.closeButton}
+            onClick={() =>
+            setHelpModal(null)
+            }
+            >
+        ×
+            </button>
+
+      {helpModal === "score" && (
+        <>
+          <h2 style={styles.modalTitle}>
+            推奨度とは？
+          </h2>
+
+          <p style={styles.modalText}>
+            推奨度は、
+            ROI・SNS適性・
+            業界平均比較・
+            リスク・
+            大手PR実績などを
+            総合評価したスコアです。
+
+            数値が高いほど、
+            「費用対効果」
+            「媒体相性」
+            「安心感」
+            が高い候補となります。
+          </p>
+        </>
+      )}
+
+      {helpModal === "average" && (
+        <>
+          <h2 style={styles.modalTitle}>
+            業界平均比とは？
+          </h2>
+
+          <p style={styles.modalText}>
+            業界平均比は、
+            保存率・CTR・
+            視聴維持率などが
+            同ジャンル平均と比較して
+            どの程度優秀かを
+            示します。
+
+            例：
+            「業界平均比 1.8倍」は、
+            平均的な
+            インフルエンサーより
+            約1.8倍優秀な指標
+            であることを意味します。
+          </p>
+        </>
+      )}
+    </div>
   </div>
-</div>
+)}
+
+
+
     </div>
   );
 }
@@ -1025,4 +1114,69 @@ helpText: {
     color: "#334155",
     paddingLeft: "20px",
   },
+helpLinks: {
+  display: "flex",
+  gap: "18px",
+  justifyContent: "center",
+  marginTop: "40px",
+  flexWrap: "wrap",
+},
+
+helpLink: {
+  background: "none",
+  border: "none",
+  color: "#1d4ed8",
+  cursor: "pointer",
+  fontWeight: 700,
+  fontSize: "14px",
+  textDecoration: "underline",
+},
+
+modalOverlay: {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.5)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 9999,
+  padding: "20px",
+},
+
+modal: {
+  background: "#fff",
+  borderRadius: "20px",
+  padding: "28px",
+  maxWidth: "520px",
+  width: "100%",
+  position: "relative",
+  boxShadow:
+    "0 20px 60px rgba(0,0,0,0.25)",
+},
+
+closeButton: {
+  position: "absolute",
+  top: "12px",
+  right: "14px",
+  border: "none",
+  background: "none",
+  fontSize: "24px",
+  cursor: "pointer",
+  color: "#64748b",
+},
+
+modalTitle: {
+  marginTop: 0,
+  fontSize: "24px",
+  color: "#0f172a",
+  fontWeight: 800,
+},
+
+modalText: {
+  color: "#334155",
+  lineHeight: 1.9,
+  fontSize: "15px",
+},
+
+
 };

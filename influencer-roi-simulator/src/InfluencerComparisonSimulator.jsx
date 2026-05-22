@@ -22,6 +22,7 @@ const createInfluencer = (index = 1) => ({
   sns: "Instagram",
   followers: 10000,
   views: 5000,
+  impressions: 30000,
   engagementRate: 3,
   cost: 100000,
   cvr: 1,
@@ -39,9 +40,17 @@ const createInfluencer = (index = 1) => ({
   descriptionCtr: 1,
   subscribeRate: 0.5,
 
-  impressions: 30000,
   repostRate: 1,
   linkCtr: 1,
+
+  majorClients: "",
+  fakeFollowerRisk: "低",
+  prRatioRisk: "低",
+
+  industryAverageSaveRate: 2.5,
+  industryAverageCtr: 1.2,
+  industryAverageRetention: 42,
+  industryAverageWatchTime: 180,
 });
 
 const initialInfluencers = [
@@ -55,6 +64,7 @@ const initialInfluencers = [
     saveRate: 4,
     profileClickRate: 2,
     storyCtr: 1.2,
+    majorClients: "星野リゾート、楽天トラベル",
   },
 ];
 
@@ -126,11 +136,82 @@ export default function InfluencerComparisonSimulator() {
       }
 
       const platformScore = Math.max(0, Math.min(100, rawPlatformScore));
-      const totalScore = roi * 0.6 + platformScore * 0.4;
+
+      let averageRatio = 1;
+
+      if (item.sns === "Instagram") {
+        averageRatio =
+          item.industryAverageSaveRate > 0
+            ? item.saveRate / item.industryAverageSaveRate
+            : 1;
+      }
+
+      if (item.sns === "TikTok") {
+        averageRatio =
+          item.industryAverageRetention > 0
+            ? item.watchRetentionRate / item.industryAverageRetention
+            : 1;
+      }
+
+      if (item.sns === "YouTube") {
+        averageRatio =
+          item.industryAverageWatchTime > 0
+            ? item.averageWatchTime / item.industryAverageWatchTime
+            : 1;
+      }
+
+      if (item.sns === "X") {
+        averageRatio =
+          item.industryAverageCtr > 0 ? item.linkCtr / item.industryAverageCtr : 1;
+      }
+
+      averageRatio = Math.max(0, Math.min(3, averageRatio));
+      const averageScore = averageRatio * 35;
+
+      const hasMajorClients =
+        item.majorClients && item.majorClients.trim().length > 0;
+
+      const trustScore = hasMajorClients ? 100 : 50;
+
+      let riskScore = 100;
+
+      if (item.fakeFollowerRisk === "高" || item.prRatioRisk === "高") {
+        riskScore = 30;
+      } else if (item.fakeFollowerRisk === "中" || item.prRatioRisk === "中") {
+        riskScore = 60;
+      }
+
+      const recommendationScore = Math.max(
+        0,
+        Math.min(
+          100,
+          roi * 0.3 +
+            platformScore * 0.25 +
+            averageScore * 0.2 +
+            trustScore * 0.15 +
+            riskScore * 0.1
+        )
+      );
+
+      let decisionLabel = "△ 要注意";
+
+      if (recommendationScore >= 80) {
+        decisionLabel = "◎ 採用推奨";
+      } else if (recommendationScore >= 60) {
+        decisionLabel = "○ 条件付き推奨";
+      } else if (recommendationScore >= 40) {
+        decisionLabel = "△ 要注意";
+      } else {
+        decisionLabel = "× 見送り候補";
+      }
 
       let rank = "C";
-      if (roi >= 100 && platformScore >= 75) rank = "A";
-      else if (roi >= 0 && platformScore >= 50) rank = "B";
+
+      if (roi >= 100 && platformScore >= 75) {
+        rank = "A";
+      } else if (roi >= 0 && platformScore >= 50) {
+        rank = "B";
+      }
 
       return {
         ...item,
@@ -141,7 +222,12 @@ export default function InfluencerComparisonSimulator() {
         roi,
         cpa,
         platformScore,
-        totalScore,
+        averageRatio,
+        averageScore,
+        trustScore,
+        riskScore,
+        recommendationScore,
+        decisionLabel,
         rank,
       };
     });
@@ -153,14 +239,12 @@ export default function InfluencerComparisonSimulator() {
 
     const averageROI =
       calculated.length > 0
-        ? calculated.reduce((sum, item) => sum + item.roi, 0) /
-          calculated.length
+        ? calculated.reduce((sum, item) => sum + item.roi, 0) / calculated.length
         : 0;
 
     const averageCPA =
       calculated.length > 0
-        ? calculated.reduce((sum, item) => sum + item.cpa, 0) /
-          calculated.length
+        ? calculated.reduce((sum, item) => sum + item.cpa, 0) / calculated.length
         : 0;
 
     return { totalSales, totalProfit, averageROI, averageCPA };
@@ -168,7 +252,9 @@ export default function InfluencerComparisonSimulator() {
 
   const bestInfluencer = useMemo(() => {
     if (calculated.length === 0) return null;
-    return [...calculated].sort((a, b) => b.totalScore - a.totalScore)[0];
+    return [...calculated].sort(
+      (a, b) => b.recommendationScore - a.recommendationScore
+    )[0];
   }, [calculated]);
 
   const pieData = calculated.map((item) => ({
@@ -182,7 +268,14 @@ export default function InfluencerComparisonSimulator() {
         item.id === id
           ? {
               ...item,
-              [key]: key === "name" || key === "sns" ? value : toNumber(value),
+              [key]:
+                key === "name" ||
+                key === "sns" ||
+                key === "majorClients" ||
+                key === "fakeFollowerRisk" ||
+                key === "prRatioRisk"
+                  ? value
+                  : toNumber(value),
             }
           : item
       )
@@ -219,12 +312,18 @@ export default function InfluencerComparisonSimulator() {
       "登録転換率",
       "リポスト率",
       "リンクCTR",
+      "大手PR実績",
+      "偽フォロワーリスク",
+      "PR案件比率リスク",
       "CV数",
       "売上",
       "利益",
       "CPA",
       "ROI",
       "SNS適性スコア",
+      "業界平均比",
+      "推奨度",
+      "採用判断",
       "判定",
     ];
 
@@ -249,12 +348,18 @@ export default function InfluencerComparisonSimulator() {
       item.subscribeRate,
       item.repostRate,
       item.linkCtr,
+      item.majorClients,
+      item.fakeFollowerRisk,
+      item.prRatioRisk,
       item.conversions.toFixed(1),
       Math.round(item.sales),
       Math.round(item.profit),
       Math.round(item.cpa),
       item.roi.toFixed(1),
       item.platformScore.toFixed(1),
+      item.averageRatio.toFixed(2),
+      item.recommendationScore.toFixed(0),
+      item.decisionLabel,
       item.rank,
     ]);
 
@@ -308,6 +413,9 @@ export default function InfluencerComparisonSimulator() {
           subscribeRate: toNumber(cols[17]),
           repostRate: toNumber(cols[18]),
           linkCtr: toNumber(cols[19]),
+          majorClients: cols[20] || "",
+          fakeFollowerRisk: cols[21] || "低",
+          prRatioRisk: cols[22] || "低",
         };
       });
 
@@ -335,19 +443,23 @@ export default function InfluencerComparisonSimulator() {
     if (!bestInfluencer) return [];
 
     return calculated.map((item) => {
+      const base = `${item.name}：推奨度は${item.recommendationScore.toFixed(
+        0
+      )}点、採用判断は「${item.decisionLabel}」です。`;
+
       if (item.sns === "Instagram") {
-        return `${item.name}：Instagramでは保存率・プロフィール遷移率・ストーリーCTRが重要です。ホテル、旅行、美容系では保存率が高い候補を優先すると相性が良いです。`;
+        return `${base} Instagramでは保存率・プロフィール遷移率・ストーリーCTRが重要です。ホテル、旅行、美容系では保存率が高い候補を優先すると相性が良いです。`;
       }
 
       if (item.sns === "TikTok") {
-        return `${item.name}：TikTokでは視聴維持率とシェア率が重要です。認知拡大や話題化を狙う場合に向いています。`;
+        return `${base} TikTokでは視聴維持率とシェア率が重要です。認知拡大や話題化を狙う場合に向いています。`;
       }
 
       if (item.sns === "YouTube") {
-        return `${item.name}：YouTubeでは平均視聴時間と概要欄CTRが重要です。高単価商材や比較検討型の訴求と相性が良いです。`;
+        return `${base} YouTubeでは平均視聴時間と概要欄CTRが重要です。高単価商材や比較検討型の訴求と相性が良いです。`;
       }
 
-      return `${item.name}：Xではインプレッション、リポスト率、リンクCTRが重要です。拡散力や話題化を狙う施策に向いています。`;
+      return `${base} Xではインプレッション、リポスト率、リンクCTRが重要です。拡散力や話題化を狙う施策に向いています。`;
     });
   }, [calculated, bestInfluencer]);
 
@@ -357,7 +469,7 @@ export default function InfluencerComparisonSimulator() {
         <div>
           <h1 style={styles.title}>Influencer ROI Simulator</h1>
           <p style={styles.subtitle}>
-            SNS媒体ごとの適性も含めてインフルエンサー施策を比較できます。
+            SNS媒体ごとの適性・実績・リスクを含めて、インフルエンサー施策を比較できます。
           </p>
         </div>
 
@@ -398,12 +510,36 @@ export default function InfluencerComparisonSimulator() {
       </div>
 
       {bestInfluencer && (
+        <div style={styles.executiveCard}>
+          <p style={styles.executiveLabel}>社長向け意思決定サマリー</p>
+
+          <h2 style={styles.executiveTitle}>推奨候補：{bestInfluencer.name}</h2>
+
+          <div style={styles.executiveScore}>
+            推奨度：{bestInfluencer.recommendationScore.toFixed(0)}点
+          </div>
+
+          <ul style={styles.executiveList}>
+            <li>採用判断：{bestInfluencer.decisionLabel}</li>
+            <li>ROI：{bestInfluencer.roi.toFixed(1)}%</li>
+            <li>SNS適性：{bestInfluencer.platformScore.toFixed(1)}点</li>
+            <li>業界平均比：{bestInfluencer.averageRatio.toFixed(1)}倍</li>
+            <li>大手PR実績：{bestInfluencer.majorClients || "未入力"}</li>
+            <li>
+              リスク：偽フォロワー {bestInfluencer.fakeFollowerRisk} / PR案件比率{" "}
+              {bestInfluencer.prRatioRisk}
+            </li>
+          </ul>
+        </div>
+      )}
+
+      {bestInfluencer && (
         <div style={styles.bestCard}>
           <div>
             <p style={styles.label}>おすすめ候補</p>
             <h2 style={styles.bestName}>{bestInfluencer.name}</h2>
             <p style={styles.bestText}>
-              ROIとSNS適性スコアを総合すると、この候補が最も有力です。
+              ROI・SNS適性・業界平均比・大手実績・リスクを総合すると、この候補が最も有力です。
             </p>
           </div>
           <div style={styles.rankBadge}>Rank {bestInfluencer.rank}</div>
@@ -499,6 +635,45 @@ export default function InfluencerComparisonSimulator() {
                     updateInfluencer(item.id, "averageOrderValue", value)
                   }
                 />
+              </Field>
+
+              <Field label="大手PR実績">
+                <input
+                  style={styles.input}
+                  value={item.majorClients}
+                  onChange={(e) =>
+                    updateInfluencer(item.id, "majorClients", e.target.value)
+                  }
+                  placeholder="例：星野リゾート、楽天トラベル、JTB"
+                />
+              </Field>
+
+              <Field label="偽フォロワーリスク">
+                <select
+                  style={styles.input}
+                  value={item.fakeFollowerRisk}
+                  onChange={(e) =>
+                    updateInfluencer(item.id, "fakeFollowerRisk", e.target.value)
+                  }
+                >
+                  <option>低</option>
+                  <option>中</option>
+                  <option>高</option>
+                </select>
+              </Field>
+
+              <Field label="PR案件比率リスク">
+                <select
+                  style={styles.input}
+                  value={item.prRatioRisk}
+                  onChange={(e) =>
+                    updateInfluencer(item.id, "prRatioRisk", e.target.value)
+                  }
+                >
+                  <option>低</option>
+                  <option>中</option>
+                  <option>高</option>
+                </select>
               </Field>
 
               {item.sns === "Instagram" && (
@@ -664,6 +839,8 @@ export default function InfluencerComparisonSimulator() {
                 {[
                   "名前",
                   "SNS",
+                  "推奨度",
+                  "採用判断",
                   "基準リーチ",
                   "CV数",
                   "売上",
@@ -671,6 +848,9 @@ export default function InfluencerComparisonSimulator() {
                   "CPA",
                   "ROI",
                   "SNS適性",
+                  "業界平均比",
+                  "大手実績",
+                  "リスク",
                   "判定",
                 ].map((head) => (
                   <th key={head} style={styles.th}>
@@ -685,6 +865,8 @@ export default function InfluencerComparisonSimulator() {
                 <tr key={item.id}>
                   <td style={styles.td}>{item.name}</td>
                   <td style={styles.td}>{item.sns}</td>
+                  <td style={styles.td}>{item.recommendationScore.toFixed(0)}点</td>
+                  <td style={styles.td}>{item.decisionLabel}</td>
                   <td style={styles.td}>{formatNumber(item.baseReach)}</td>
                   <td style={styles.td}>{formatNumber(item.conversions)}</td>
                   <td style={styles.td}>{formatYen(item.sales)}</td>
@@ -700,6 +882,11 @@ export default function InfluencerComparisonSimulator() {
                   <td style={styles.td}>{formatYen(item.cpa)}</td>
                   <td style={styles.td}>{item.roi.toFixed(1)}%</td>
                   <td style={styles.td}>{item.platformScore.toFixed(1)}</td>
+                  <td style={styles.td}>{item.averageRatio.toFixed(1)}倍</td>
+                  <td style={styles.td}>{item.majorClients || "未入力"}</td>
+                  <td style={styles.td}>
+                    偽:{item.fakeFollowerRisk} / PR:{item.prRatioRisk}
+                  </td>
                   <td style={styles.td}>
                     <span style={styles.smallBadge}>Rank {item.rank}</span>
                   </td>
@@ -713,7 +900,7 @@ export default function InfluencerComparisonSimulator() {
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>AI分析コメント</h2>
         <p style={styles.comment}>
-          総合おすすめは「{bestInfluencer?.name}」です。ROIだけでなく、SNS適性スコアも加味して判定しています。
+          総合おすすめは「{bestInfluencer?.name}」です。ROIだけでなく、SNS適性・業界平均比・大手実績・リスクも加味して判定しています。
         </p>
         <ul style={styles.commentList}>
           {aiComments.map((comment, index) => (
@@ -721,125 +908,71 @@ export default function InfluencerComparisonSimulator() {
           ))}
         </ul>
       </div>
+
       <div style={styles.card}>
-    <h2 style={styles.sectionTitle}>判定基準ヘルプ</h2>
+        <h2 style={styles.sectionTitle}>判定基準ヘルプ</h2>
 
         <div style={styles.helpBox}>
-            <h3 style={styles.helpTitle}>SNS適性スコア</h3>
-            <p style={styles.helpText}>
-      SNSごとに重要な指標を点数化したものです。Instagramは保存率やプロフィール遷移率、TikTokは視聴維持率やシェア率、YouTubeは平均視聴時間や概要欄CTR、XはリンクCTRやリポスト率を重視しています。
-            </p>
+          <h3 style={styles.helpTitle}>推奨度</h3>
+          <p style={styles.helpText}>
+            推奨度は、ROI・SNS適性・業界平均比・大手PR実績・リスクを総合評価したスコアです。数値が高いほど、費用対効果と安心材料の両方が強い候補です。
+          </p>
         </div>
 
         <div style={styles.helpBox}>
-            <h3 style={styles.helpTitle}>Rank A</h3>
-            <p style={styles.helpText}>
-      ROIが100%以上、かつSNS適性スコアが75以上の候補です。費用対効果と媒体相性の両方が高い候補として判定されます。
-            </p>
+          <h3 style={styles.helpTitle}>業界平均比</h3>
+          <p style={styles.helpText}>
+            業界平均比は、保存率・視聴維持率・平均視聴時間・リンクCTRなどを、想定される平均値と比較した倍率です。1.0倍を超えるほど平均より優秀という見方になります。
+          </p>
         </div>
 
         <div style={styles.helpBox}>
-            <h3 style={styles.helpTitle}>Rank B</h3>
-            <p style={styles.helpText}>
-      ROIが0%以上、かつSNS適性スコアが50以上の候補です。最低限の利益が見込め、媒体相性も一定以上ある候補です。
-            </p>
+          <h3 style={styles.helpTitle}>Rank A / B / C</h3>
+          <p style={styles.helpText}>
+            Rank AはROIとSNS適性の両方が高い候補、Rank Bは一定の効果が見込める候補、Rank Cは費用交渉や内容見直しが必要な候補です。
+          </p>
         </div>
+      </div>
 
-        <div style={styles.helpBox}>
-            <h3 style={styles.helpTitle}>Rank C</h3>
-            <p style={styles.helpText}>
-      ROIまたはSNS適性スコアが基準を下回る候補です。費用交渉、投稿内容の見直し、または見送りを検討する候補です。
-            </p>
-        </div>
-    </div>
-
-
-
-
-    <div style={styles.helpLinks}>
-        <button
-        style={styles.helpLink}
-        onClick={() =>
-          setHelpModal("score")
-        }
-        >
-        推奨度とは？
+      <div style={styles.helpLinks}>
+        <button style={styles.helpLink} onClick={() => setHelpModal("score")}>
+          推奨度とは？
         </button>
 
-        <button
-         style={styles.helpLink}
-         onClick={() =>
-          setHelpModal("average")
-            } 
-        >
-        業界平均比とは？
+        <button style={styles.helpLink} onClick={() => setHelpModal("average")}>
+          業界平均比とは？
         </button>
-    </div>
+      </div>
 
-    {helpModal && (
-    <div style={styles.modalOverlay}>
-        <div style={styles.modal}>
-            <button
-            style={styles.closeButton}
-            onClick={() =>
-            setHelpModal(null)
-            }
-            >
-        ×
+      {helpModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <button style={styles.closeButton} onClick={() => setHelpModal(null)}>
+              ×
             </button>
 
-      {helpModal === "score" && (
-        <>
-          <h2 style={styles.modalTitle}>
-            推奨度とは？
-          </h2>
+            {helpModal === "score" && (
+              <>
+                <h2 style={styles.modalTitle}>推奨度とは？</h2>
+                <p style={styles.modalText}>
+                  推奨度は、ROI・SNS適性・業界平均比較・大手PR実績・リスクなどを総合評価したスコアです。
+                  数値が高いほど「費用対効果」「媒体相性」「安心感」が高い候補となります。
+                </p>
+              </>
+            )}
 
-          <p style={styles.modalText}>
-            推奨度は、
-            ROI・SNS適性・
-            業界平均比較・
-            リスク・
-            大手PR実績などを
-            総合評価したスコアです。
-
-            数値が高いほど、
-            「費用対効果」
-            「媒体相性」
-            「安心感」
-            が高い候補となります。
-          </p>
-        </>
+            {helpModal === "average" && (
+              <>
+                <h2 style={styles.modalTitle}>業界平均比とは？</h2>
+                <p style={styles.modalText}>
+                  業界平均比は、保存率・CTR・視聴維持率などが同ジャンル平均と比較してどの程度優秀かを示します。
+                  例：「業界平均比 1.8倍」は、平均的なインフルエンサーより約1.8倍優秀な指標であることを意味します。
+                </p>
+              </>
+            )}
+          </div>
+        </div>
       )}
-
-      {helpModal === "average" && (
-        <>
-          <h2 style={styles.modalTitle}>
-            業界平均比とは？
-          </h2>
-
-          <p style={styles.modalText}>
-            業界平均比は、
-            保存率・CTR・
-            視聴維持率などが
-            同ジャンル平均と比較して
-            どの程度優秀かを
-            示します。
-
-            例：
-            「業界平均比 1.8倍」は、
-            平均的な
-            インフルエンサーより
-            約1.8倍優秀な指標
-            であることを意味します。
-          </p>
-        </>
-      )}
-    </div>
-  </div>
-)}
-
-
-
     </div>
   );
 }
@@ -881,29 +1014,6 @@ function KpiCard({ title, value, danger }) {
 }
 
 const styles = {
-helpBox: {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  borderRadius: "16px",
-  padding: "16px",
-  marginTop: "14px",
-  color: "#0f172a",
-},
-
-helpTitle: {
-  margin: "0 0 8px",
-  fontSize: "16px",
-  fontWeight: 800,
-  color: "#1d4ed8",
-},
-
-helpText: {
-  margin: 0,
-  color: "#0f172a",
-  lineHeight: 1.8,
-  fontSize: "14px",
-},
-
   page: {
     minHeight: "100vh",
     background: "#f3f6fb",
@@ -922,6 +1032,7 @@ helpText: {
     fontSize: "32px",
     fontWeight: 800,
     margin: 0,
+    color: "#0f172a",
   },
   subtitle: {
     color: "#64748b",
@@ -972,6 +1083,41 @@ helpText: {
     fontSize: "30px",
     fontWeight: 800,
   },
+  executiveCard: {
+    background: "#0f172a",
+    color: "#ffffff",
+    borderRadius: "24px",
+    padding: "28px",
+    marginBottom: "24px",
+    boxShadow: "0 16px 40px rgba(15,23,42,0.25)",
+  },
+  executiveLabel: {
+    margin: 0,
+    fontSize: "13px",
+    color: "#cbd5e1",
+    fontWeight: 700,
+  },
+  executiveTitle: {
+    fontSize: "28px",
+    margin: "8px 0 16px",
+    fontWeight: 800,
+    color: "#ffffff",
+  },
+  executiveScore: {
+    display: "inline-block",
+    background: "#ffffff",
+    color: BLUE,
+    borderRadius: "999px",
+    padding: "10px 18px",
+    fontWeight: 800,
+    marginBottom: "16px",
+  },
+  executiveList: {
+    margin: 0,
+    paddingLeft: "20px",
+    lineHeight: 1.9,
+    color: "#e2e8f0",
+  },
   bestCard: {
     background: "linear-gradient(135deg, #1d4ed8, #2563eb)",
     color: "#fff",
@@ -1004,11 +1150,11 @@ helpText: {
   },
   card: {
     background: "#fff",
+    color: "#0f172a",
     borderRadius: "22px",
     padding: "24px",
     marginBottom: "24px",
     boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
-    color: "#0f172a",
   },
   cardHeader: {
     display: "flex",
@@ -1019,8 +1165,8 @@ helpText: {
   sectionTitle: {
     fontSize: "20px",
     margin: 0,
-      color: "#0f172a",
-  fontWeight: 800,
+    color: "#0f172a",
+    fontWeight: 800,
   },
   inputGrid: {
     display: "grid",
@@ -1044,6 +1190,8 @@ helpText: {
     borderRadius: "10px",
     border: "1px solid #cbd5e1",
     fontWeight: 700,
+    color: "#0f172a",
+    background: "#fff",
   },
   deleteButton: {
     background: "#fee2e2",
@@ -1071,6 +1219,8 @@ helpText: {
     padding: "10px",
     borderRadius: "10px",
     border: "1px solid #cbd5e1",
+    color: "#0f172a",
+    background: "#fff",
   },
   twoColumn: {
     display: "grid",
@@ -1083,7 +1233,7 @@ helpText: {
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    minWidth: "900px",
+    minWidth: "1200px",
   },
   th: {
     textAlign: "left",
@@ -1097,6 +1247,7 @@ helpText: {
     padding: "12px",
     borderBottom: "1px solid #e2e8f0",
     whiteSpace: "nowrap",
+    color: "#0f172a",
   },
   smallBadge: {
     background: "#dbeafe",
@@ -1114,69 +1265,80 @@ helpText: {
     color: "#334155",
     paddingLeft: "20px",
   },
-helpLinks: {
-  display: "flex",
-  gap: "18px",
-  justifyContent: "center",
-  marginTop: "40px",
-  flexWrap: "wrap",
-},
-
-helpLink: {
-  background: "none",
-  border: "none",
-  color: "#1d4ed8",
-  cursor: "pointer",
-  fontWeight: 700,
-  fontSize: "14px",
-  textDecoration: "underline",
-},
-
-modalOverlay: {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.5)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 9999,
-  padding: "20px",
-},
-
-modal: {
-  background: "#fff",
-  borderRadius: "20px",
-  padding: "28px",
-  maxWidth: "520px",
-  width: "100%",
-  position: "relative",
-  boxShadow:
-    "0 20px 60px rgba(0,0,0,0.25)",
-},
-
-closeButton: {
-  position: "absolute",
-  top: "12px",
-  right: "14px",
-  border: "none",
-  background: "none",
-  fontSize: "24px",
-  cursor: "pointer",
-  color: "#64748b",
-},
-
-modalTitle: {
-  marginTop: 0,
-  fontSize: "24px",
-  color: "#0f172a",
-  fontWeight: 800,
-},
-
-modalText: {
-  color: "#334155",
-  lineHeight: 1.9,
-  fontSize: "15px",
-},
-
-
+  helpBox: {
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    borderRadius: "16px",
+    padding: "16px",
+    marginTop: "14px",
+    color: "#0f172a",
+  },
+  helpTitle: {
+    margin: "0 0 8px",
+    fontSize: "16px",
+    fontWeight: 800,
+    color: BLUE,
+  },
+  helpText: {
+    margin: 0,
+    color: "#0f172a",
+    lineHeight: 1.8,
+    fontSize: "14px",
+  },
+  helpLinks: {
+    display: "flex",
+    gap: "18px",
+    justifyContent: "center",
+    marginTop: "40px",
+    flexWrap: "wrap",
+  },
+  helpLink: {
+    background: "none",
+    border: "none",
+    color: BLUE,
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: "14px",
+    textDecoration: "underline",
+  },
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+    padding: "20px",
+  },
+  modal: {
+    background: "#fff",
+    borderRadius: "20px",
+    padding: "28px",
+    maxWidth: "520px",
+    width: "100%",
+    position: "relative",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+  },
+  closeButton: {
+    position: "absolute",
+    top: "12px",
+    right: "14px",
+    border: "none",
+    background: "none",
+    fontSize: "24px",
+    cursor: "pointer",
+    color: "#64748b",
+  },
+  modalTitle: {
+    marginTop: 0,
+    fontSize: "24px",
+    color: "#0f172a",
+    fontWeight: 800,
+  },
+  modalText: {
+    color: "#334155",
+    lineHeight: 1.9,
+    fontSize: "15px",
+  },
 };

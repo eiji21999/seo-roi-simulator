@@ -84,6 +84,7 @@ export default function InfluencerComparisonSimulator() {
   const [influencers, setInfluencers] = useState(initialInfluencers);
   const [copied, setCopied] = useState(false);
   const [helpModal, setHelpModal] = useState(null);
+  const [openHelp, setOpenHelp] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -912,26 +913,117 @@ export default function InfluencerComparisonSimulator() {
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>判定基準ヘルプ</h2>
 
-        <div style={styles.helpBox}>
-          <h3 style={styles.helpTitle}>推奨度</h3>
-          <p style={styles.helpText}>
-            推奨度は、ROI・SNS適性・業界平均比・大手PR実績・リスクを総合評価したスコアです。数値が高いほど、費用対効果と安心材料の両方が強い候補です。
-          </p>
-        </div>
+       <div style={styles.accordionWrap}>
 
-        <div style={styles.helpBox}>
-          <h3 style={styles.helpTitle}>業界平均比</h3>
-          <p style={styles.helpText}>
-            業界平均比は、保存率・視聴維持率・平均視聴時間・リンクCTRなどを、想定される平均値と比較した倍率です。1.0倍を超えるほど平均より優秀という見方になります。
-          </p>
-        </div>
+  <AccordionItem
+    title="推奨度とは？"
+    isOpen={openHelp === "score"}
+    onClick={() =>
+      setOpenHelp(
+        openHelp === "score"
+          ? null
+          : "score"
+      )
+    }
+  >
+    推奨度は、
+    ROI・SNS適性・
+    業界平均比較・
+    大手PR実績・
+    リスクを
+    総合評価した
+    スコアです。
+  </AccordionItem>
 
-        <div style={styles.helpBox}>
-          <h3 style={styles.helpTitle}>Rank A / B / C</h3>
-          <p style={styles.helpText}>
-            Rank AはROIとSNS適性の両方が高い候補、Rank Bは一定の効果が見込める候補、Rank Cは費用交渉や内容見直しが必要な候補です。
-          </p>
-        </div>
+  <AccordionItem
+    title="業界平均比とは？"
+    isOpen={openHelp === "average"}
+    onClick={() =>
+      setOpenHelp(
+        openHelp === "average"
+          ? null
+          : "average"
+      )
+    }
+  >
+    保存率・CTR・
+    視聴維持率などが、
+    同ジャンル平均と
+    比較して
+    どの程度優秀かを
+    示します。
+  </AccordionItem>
+
+  <AccordionItem
+    title="業界平均値の参照について"
+    isOpen={openHelp === "benchmark"}
+    onClick={() =>
+      setOpenHelp(
+        openHelp === "benchmark"
+          ? null
+          : "benchmark"
+      )
+    }
+  >
+    現在の業界平均値は、
+    Hootsuite、
+    Socialinsider等の
+    SNSマーケティング
+    ベンチマークを参考にした
+    暫定値です。
+
+    実際の提案時は、
+    同ジャンル・
+    同規模アカウントとの
+    比較を推奨します。
+  </AccordionItem>
+
+  <AccordionItem
+    title="偽フォロワーリスクとは？"
+    isOpen={
+      openHelp === "fake"
+    }
+    onClick={() =>
+      setOpenHelp(
+        openHelp === "fake"
+          ? null
+          : "fake"
+      )
+    }
+  >
+    コメントの自然さ、
+    エンゲージメント率、
+    フォロワー増加推移などから
+    判断します。
+
+    フォロワー数に対して
+    反応が極端に少ない場合は
+    リスク高となります。
+  </AccordionItem>
+
+  <AccordionItem
+    title="PR案件比率リスクとは？"
+    isOpen={openHelp === "pr"}
+    onClick={() =>
+      setOpenHelp(
+        openHelp === "pr"
+          ? null
+          : "pr"
+      )
+    }
+  >
+    直近投稿における
+    PR案件比率です。
+
+    PR投稿が多すぎる場合、
+    フォロワー離脱や
+    エンゲージメント低下の
+    リスクがあります。
+  </AccordionItem>
+
+</div>
+
+
       </div>
 
       <div style={styles.helpLinks}>
@@ -1009,6 +1101,38 @@ function KpiCard({ title, value, danger }) {
       >
         {value}
       </h2>
+    </div>
+  );
+}
+
+function AccordionItem({
+  title,
+  isOpen,
+  onClick,
+  children,
+}) {
+  return (
+    <div style={styles.accordionItem}>
+      <button
+        style={styles.accordionButton}
+        onClick={onClick}
+      >
+        <span>{title}</span>
+
+        <span>
+          {isOpen ? "−" : "+"}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div
+          style={
+            styles.accordionContent
+          }
+        >
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -1341,4 +1465,38 @@ const styles = {
     lineHeight: 1.9,
     fontSize: "15px",
   },
+  accordionWrap: {
+  marginTop: "16px",
+},
+
+accordionItem: {
+  border:
+    "1px solid #e2e8f0",
+  borderRadius: "14px",
+  marginBottom: "12px",
+  overflow: "hidden",
+},
+
+accordionButton: {
+  width: "100%",
+  border: "none",
+  background: "#f8fafc",
+  padding: "18px",
+  display: "flex",
+  justifyContent:
+    "space-between",
+  alignItems: "center",
+  fontWeight: 700,
+  cursor: "pointer",
+  color: "#0f172a",
+  fontSize: "15px",
+},
+
+accordionContent: {
+  padding: "18px",
+  background: "#fff",
+  color: "#334155",
+  lineHeight: 1.9,
+  fontSize: "14px",
+},
 };
